@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:sadat_delivery_merged/main.dart' show navigatorKey;
 import 'package:sadat_delivery_merged/user/main.dart' show openOffersTab;
 import 'package:sadat_delivery_merged/user/screens/orders/order_details_screen.dart';
+import 'package:sadat_delivery_merged/user/screens/chat/support_chat_tab.dart';
+import 'package:sadat_delivery_merged/user/screens/chat/order_chat_screen.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 import 'user_order_service.dart';
@@ -53,13 +55,23 @@ void _handleUserNotificationData(Map<String, dynamic> data) {
     case 'ANNOUNCEMENT':
       openOffersTab.value = DateTime.now().millisecondsSinceEpoch;
       break;
+    case 'chat_message':
+      ('New chat message in chat: ${data['chatId']}');
+      break;
   }
 }
 
 /// Handles a notification tap: if it carries an order-related type and an
-/// orderId, fetches that order and pushes the order details screen.
+/// orderId, fetches that order and pushes the order details screen. A
+/// chat_message notification instead opens the relevant chat thread.
 Future<void> _handleUserNotificationTap(Map<String, dynamic> data) async {
   final type = data['type'] as String?;
+
+  if (type == 'chat_message') {
+    _openChatFromNotification(data);
+    return;
+  }
+
   final orderId = data['orderId'] as String?;
   if (orderId == null || orderId.isEmpty) return;
   if (type != null && !_kOrderNotificationTypes.contains(type)) return;
@@ -72,6 +84,68 @@ Future<void> _handleUserNotificationTap(Map<String, dynamic> data) async {
       builder: (_) => _OrderLoadingScreen(orderId: orderId),
     ),
   );
+}
+
+void _openChatFromNotification(Map<String, dynamic> data) {
+  final navState = navigatorKey.currentState;
+  if (navState == null) return;
+  final chatId = data['chatId'] as String?;
+  if (chatId == null) return;
+
+  if (chatId.startsWith('support_user_')) {
+    navState.push(MaterialPageRoute(builder: (_) => const SupportChatTab()));
+    return;
+  }
+
+  final orderId = data['orderId'] as String?;
+  if (chatId.endsWith('_user_captain') && orderId != null && orderId.isNotEmpty) {
+    navState.push(MaterialPageRoute(builder: (_) => _OrderChatLoadingScreen(orderId: orderId)));
+  }
+}
+
+/// Loads the order (to get the captain's id/name) before opening the
+/// order-scoped chat — mirrors _OrderLoadingScreen's fetch-then-navigate
+/// pattern for order detail notifications.
+class _OrderChatLoadingScreen extends StatefulWidget {
+  final String orderId;
+  const _OrderChatLoadingScreen({required this.orderId});
+
+  @override
+  State<_OrderChatLoadingScreen> createState() => _OrderChatLoadingScreenState();
+}
+
+class _OrderChatLoadingScreenState extends State<_OrderChatLoadingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final response = await UserOrderService().getOrderById(widget.orderId);
+    if (!mounted) return;
+
+    final captain = response.data?.captain;
+    if (response.success && captain != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OrderChatScreen(
+            orderId: widget.orderId,
+            captainId: captain.id,
+            captainName: captain.userName,
+            orderStatus: response.data!.status,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
 }
 
 /// Lightweight screen shown immediately on notification tap while the full

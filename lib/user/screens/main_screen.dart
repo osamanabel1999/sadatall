@@ -7,6 +7,7 @@ import 'vendors/vendors_list_screen.dart';
 import 'orders/orders_list_screen.dart';
 import 'settings/settings_screen.dart';
 import 'offers/offers_screen.dart';
+import 'chat/support_chat_tab.dart';
 import '../main.dart' show openOffersTab;
 
 class MainScreen extends StatefulWidget {
@@ -41,6 +42,7 @@ class _MainScreenState extends State<MainScreen> {
     const OrdersListScreen(),
     const SettingsScreen(),
     const OffersScreen(),
+    const SupportChatTab(),
   ];
 
   final List<BottomNavigationBarItem> _navItems = [
@@ -69,6 +71,11 @@ class _MainScreenState extends State<MainScreen> {
       activeIcon: Icon(Icons.local_offer),
       label: 'عروض',
     ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.support_agent_outlined),
+      activeIcon: Icon(Icons.support_agent),
+      label: 'الدعم',
+    ),
   ];
 
   @override
@@ -82,7 +89,7 @@ class _MainScreenState extends State<MainScreen> {
             context,
             listen: false,
           );
-          if ((index == 2 || index == 3) && !authProvider.isAuthenticated) {
+          if ((index == 2 || index == 3 || index == 5) && !authProvider.isAuthenticated) {
             Navigator.of(context).pushNamed('/login');
             return;
           }

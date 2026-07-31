@@ -9,6 +9,7 @@ import 'counter_offer_screen.dart';
 import '../../utils/time_utils.dart';
 import '../../widgets/attachments/attachment_display_widget.dart';
 import '../../widgets/common/smart_image.dart';
+import '../chat/vendor_order_chat_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -304,6 +305,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ),
         elevation: 0,
         actions: [
+          if (_order.captain != null)
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+              tooltip: 'محادثة مع الكابتن',
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => VendorOrderChatScreen(
+                    orderId: _order.id.toString(),
+                    captainId: _order.captain!.id,
+                    captainName: _order.captain!.userName,
+                    orderStatus: _order.status,
+                  ),
+                ));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.phone, color: Colors.white),
             onPressed: _callCustomer,

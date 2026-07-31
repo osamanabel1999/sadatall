@@ -27,6 +27,14 @@ void _handleCaptainOrderNotification(Map<String, dynamic> data) {
   final type = data['type'] as String?;
   if (type == null) return;
 
+  if (type == 'chat_message') {
+    // Captain only ever chats within an order context (user or vendor side)
+    // — the chat entry buttons live on the current-order screen, so route
+    // there rather than deep-linking into a specific chat thread.
+    rootProviderContainer.read(switchToCurrentOrderTab)?.call();
+    return;
+  }
+
   if (_kAvailableOrderTypes.contains(type)) {
     rootProviderContainer.read(switchToAvailableOrdersTab)?.call();
   } else if (_kCurrentOrderTypes.contains(type)) {
@@ -200,6 +208,10 @@ class NotificationService {
         break;
       case 'request_reply':
         _handleRequestReplyNotification(message);
+        break;
+      case 'chat_message':
+        // Local notification already shown above; navigation on tap is
+        // handled by _handleCaptainOrderNotification via onMessageOpenedApp.
         break;
       default:
         if (kDebugMode) {

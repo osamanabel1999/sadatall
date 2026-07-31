@@ -8,6 +8,8 @@ import 'dart:convert';
 import 'order_service.dart';
 import 'auth_service.dart';
 import '../utils/time_utils.dart';
+import '../screens/chat/vendor_support_chat_tab.dart';
+import '../screens/chat/vendor_order_chat_screen.dart';
 
 const Set<String> _kOrderNotificationTypes = {
   'NEW_ORDER',
@@ -218,6 +220,11 @@ class NotificationService {
     final type = data['type'] as String?;
     final orderId = data['orderId'] as String?;
 
+    if (type == 'chat_message') {
+      _openChatFromNotification(data);
+      return;
+    }
+
     if (orderId != null && (type == null || _kOrderNotificationTypes.contains(type))) {
       final navState = navigatorKey.currentState;
       if (navState != null) {
@@ -248,6 +255,23 @@ class NotificationService {
           );
         },
       );
+    }
+  }
+
+  void _openChatFromNotification(Map<String, dynamic> data) {
+    final navState = navigatorKey.currentState;
+    if (navState == null) return;
+    final chatId = data['chatId'] as String?;
+    if (chatId == null) return;
+
+    if (chatId.startsWith('support_vendor_')) {
+      navState.push(MaterialPageRoute(builder: (_) => const VendorSupportChatTab()));
+      return;
+    }
+
+    final orderId = data['orderId'] as String?;
+    if (chatId.endsWith('_vendor_captain') && orderId != null && orderId.isNotEmpty) {
+      navState.push(MaterialPageRoute(builder: (_) => _VendorOrderChatLoadingScreen(orderId: orderId)));
     }
   }
 
@@ -434,5 +458,49 @@ class _VendorOrderLoadingScreenState extends State<_VendorOrderLoadingScreen> {
     return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
     );
+  }
+}
+
+/// Loads the order (to get the captain's id/name) before opening the
+/// order-scoped chat.
+class _VendorOrderChatLoadingScreen extends StatefulWidget {
+  final String orderId;
+  const _VendorOrderChatLoadingScreen({required this.orderId});
+
+  @override
+  State<_VendorOrderChatLoadingScreen> createState() => _VendorOrderChatLoadingScreenState();
+}
+
+class _VendorOrderChatLoadingScreenState extends State<_VendorOrderChatLoadingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final response = await OrderService().getOrderById(widget.orderId);
+    if (!mounted) return;
+
+    final captain = response.data?.captain;
+    if (response.success && captain != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => VendorOrderChatScreen(
+            orderId: widget.orderId,
+            captainId: captain.id,
+            captainName: captain.userName,
+            orderStatus: response.data!.status,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

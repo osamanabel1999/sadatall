@@ -7,6 +7,7 @@ import '../menu/menu_management_screen.dart';
 import '../settings/settings_screen.dart';
 import '../announcements/vendor_offers_screen.dart';
 import '../../services/notification_service.dart';
+import '../chat/vendor_support_chat_tab.dart';
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -35,6 +36,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
       const MenuManagementScreen(),
       const VendorOffersScreen(),
       const SettingsScreen(),
+      const VendorSupportChatTab(),
     ];
 
     _navItems = [
@@ -67,6 +69,11 @@ class _MainAppScreenState extends State<MainAppScreen> {
         icon: Icon(Icons.settings_outlined),
         activeIcon: Icon(Icons.settings),
         label: 'الإعدادات',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.support_agent_outlined),
+        activeIcon: Icon(Icons.support_agent),
+        label: 'الدعم',
       ),
     ];
   }

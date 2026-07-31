@@ -11,6 +11,7 @@ import '../../widgets/attachments/attachment_display_widget.dart';
 import '../../widgets/common/smart_image.dart';
 import '../../../captain/core/widgets/clickable_phone_text.dart'
     show ClickablePhoneText;
+import '../chat/order_chat_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -441,6 +442,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         backgroundColor: Colors.blue[700],
         elevation: 0,
         actions: [
+          if (_order.captain != null)
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+              tooltip: 'محادثة مع الكابتن',
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => OrderChatScreen(
+                    orderId: _order.id.toString(),
+                    captainId: _order.captain!.id,
+                    captainName: _order.captain!.userName,
+                    orderStatus: _order.status,
+                  ),
+                ));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.phone, color: Colors.white),
             onPressed: _callVendor,

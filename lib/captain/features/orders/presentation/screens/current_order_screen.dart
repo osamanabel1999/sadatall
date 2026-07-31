@@ -8,6 +8,7 @@ import '../../../../core/utils/app_utils.dart';
 import '../../data/models/order_model.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/order_attachments_widget.dart';
+import '../../../chat/captain_order_chat_screen.dart';
 
 class CurrentOrderScreen extends ConsumerStatefulWidget {
   const CurrentOrderScreen({Key? key}) : super(key: key);
@@ -284,6 +285,50 @@ class _CurrentOrderScreenState extends ConsumerState<CurrentOrderScreen> {
                 ),
               ],
             ),
+            if (order.user != null) ...[
+              const SizedBox(height: 8),
+              CustomButton(
+                text: 'محادثة مع العميل',
+                onPressed: isProcessing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => CaptainOrderChatScreen(
+                            orderId: order.id,
+                            otherId: order.user!.id,
+                            otherName: order.user!.userName,
+                            isVendor: false,
+                            orderStatus: order.status.value,
+                          ),
+                        ));
+                      },
+                type: ButtonType.outlined,
+                icon: Icons.chat_bubble_outline,
+                height: 40,
+              ),
+            ],
+            if (order.vendor != null && order.vendorId != '-1') ...[
+              const SizedBox(height: 8),
+              CustomButton(
+                text: 'محادثة مع المتجر',
+                onPressed: isProcessing
+                    ? null
+                    : () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => CaptainOrderChatScreen(
+                            orderId: order.id,
+                            otherId: order.vendor!.id,
+                            otherName: order.vendor!.vendorName,
+                            isVendor: true,
+                            orderStatus: order.status.value,
+                          ),
+                        ));
+                      },
+                type: ButtonType.outlined,
+                icon: Icons.storefront_outlined,
+                height: 40,
+              ),
+            ],
             const SizedBox(height: 8),
             CustomButton(
               text: 'إشعار العميل بالوصول',
