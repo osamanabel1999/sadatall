@@ -12,8 +12,13 @@ ChatAttachmentService buildVendorChatAttachmentService() {
       data: {'chatId': chatId},
     );
     // Vendor's ApiResponse already unwraps the top-level "data" envelope.
-    if (!response.success || response.data == null) return null;
+    if (!response.success || response.data == null) {
+      throw Exception(response.error ?? response.message ?? 'رفع المرفق فشل بدون سبب معروف');
+    }
     final data = response.data!;
+    if (data['key'] == null || data['url'] == null) {
+      throw Exception('استجابة رفع المرفق غير مكتملة');
+    }
     return ChatUploadResult(key: data['key'] as String, url: data['url'] as String);
   });
 }

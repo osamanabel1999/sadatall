@@ -9,7 +9,9 @@ ChatAttachmentService buildCaptainChatAttachmentService() {
   final storage = StorageService();
   return ChatAttachmentService(({required File file, required String chatId}) async {
     final token = await storage.getSecureString(StorageService.keyAuthToken);
-    if (token == null) return null;
+    if (token == null) {
+      throw Exception('لا يمكن رفع المرفق: لم يتم تسجيل الدخول');
+    }
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/chat-uploads');
     final request = http.MultipartRequest('POST', uri);
@@ -19,11 +21,14 @@ ChatAttachmentService buildCaptainChatAttachmentService() {
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
-    if (response.statusCode < 200 || response.statusCode >= 300) return null;
-
     final body = jsonDecode(response.body);
-    if (body['success'] != true || body['data'] == null) return null;
+    if (response.statusCode < 200 || response.statusCode >= 300 || body['success'] != true || body['data'] == null) {
+      throw Exception(body['error'] ?? body['message'] ?? 'رفع المرفق فشل (${response.statusCode})');
+    }
     final data = body['data'] as Map<String, dynamic>;
+    if (data['key'] == null || data['url'] == null) {
+      throw Exception('استجابة رفع المرفق غير مكتملة');
+    }
     return ChatUploadResult(key: data['key'] as String, url: data['url'] as String);
   });
 }

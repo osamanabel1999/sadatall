@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/chat_attachment_service.dart';
@@ -83,7 +84,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendText(String text) async {
     final chatId = _thread?.id;
     if (chatId == null) return;
-    await _repo.sendTextMessage(chatId: chatId, sender: widget.self, text: text);
+    try {
+      await _repo.sendTextMessage(chatId: chatId, sender: widget.self, text: text);
+    } catch (e) {
+      _showError('تعذر إرسال الرسالة', e);
+    }
   }
 
   Future<void> _handleAttach() async {
@@ -108,11 +113,15 @@ class _ChatScreenState extends State<ChatScreen> {
         if (file != null) await _uploadAndSend(file, MessageType.voice, chatId);
         break;
       case ChatAttachmentChoice.location:
-        final loc = await widget.getCurrentLocation?.call();
-        if (loc != null) {
-          await _repo.sendLocationMessage(chatId: chatId, sender: widget.self, lat: loc.lat, lng: loc.lng);
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديد الموقع')));
+        try {
+          final loc = await widget.getCurrentLocation?.call();
+          if (loc != null) {
+            await _repo.sendLocationMessage(chatId: chatId, sender: widget.self, lat: loc.lat, lng: loc.lng);
+          } else if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديد الموقع')));
+          }
+        } catch (e) {
+          _showError('تعذر إرسال الموقع', e);
         }
         break;
     }
@@ -123,17 +132,34 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('رفع المرفقات غير متاح')));
       return;
     }
-    final result = await widget.attachmentService!.upload(file: file, chatId: chatId);
-    if (result == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل رفع المرفق')));
-      return;
+    try {
+      final result = await widget.attachmentService!.upload(file: file, chatId: chatId);
+      if (result == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل رفع المرفق')));
+        return;
+      }
+      await _repo.sendAttachmentMessage(
+        chatId: chatId,
+        sender: widget.self,
+        type: type,
+        attachmentKey: result.key,
+        attachmentUrl: result.url,
+      );
+    } catch (e) {
+      // Covers both the upload call itself throwing (network/auth error not
+      // caught inside the mode's uploader) and the Firestore write throwing
+      // (e.g. permission-denied if firestore.rules haven't been deployed,
+      // or the custom-token sign-in silently failed) — without this, both
+      // failed completely silently: no message sent, no feedback shown.
+      _showError('فشل رفع المرفق', e);
     }
-    await _repo.sendAttachmentMessage(
-      chatId: chatId,
-      sender: widget.self,
-      type: type,
-      attachmentKey: result.key,
-      attachmentUrl: result.url,
+  }
+
+  void _showError(String prefix, Object error) {
+    if (kDebugMode) debugPrint('$prefix: $error');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$prefix: $error')),
     );
   }
 
