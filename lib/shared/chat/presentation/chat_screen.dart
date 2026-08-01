@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:image_picker/image_picker.dart';
 import '../data/chat_attachment_service.dart';
 import '../data/chat_repository.dart';
@@ -156,10 +157,28 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showError(String prefix, Object error) {
-    if (kDebugMode) debugPrint('$prefix: $error');
+    final message = '$prefix: $error';
+    if (kDebugMode) debugPrint(message);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$prefix: $error')),
+    // A dialog instead of a SnackBar: SnackBars auto-dismiss and clip long
+    // text, which made earlier error messages here unreadable/uncopyable
+    // (users could only report the first few words before it vanished).
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حدث خطأ'),
+        content: SelectableText(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: message));
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('تم النسخ')));
+            },
+            child: const Text('نسخ'),
+          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('حسناً')),
+        ],
+      ),
     );
   }
 
