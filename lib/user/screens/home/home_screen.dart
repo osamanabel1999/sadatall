@@ -9,7 +9,7 @@ import '../../widgets/common/skeleton_widget.dart';
 import '../../widgets/common/smart_image.dart';
 import '../vendors/vendor_details_screen.dart';
 import '../orders/create_order_screen.dart';
-import '../../widgets/home/ad_carousel.dart';
+import '../../widgets/home/promo_ad_carousel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -243,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildSearchHeader()),
-              const SliverToBoxAdapter(child: AdCarousel()),
+              const SliverToBoxAdapter(child: PromoAdCarousel()),
               SliverToBoxAdapter(child: _buildCategoryChips()),
               SliverToBoxAdapter(child: _buildQuickPicks()),
               SliverToBoxAdapter(child: _buildCustomOrderBanner()),
