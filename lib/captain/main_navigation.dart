@@ -10,6 +10,7 @@ import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/requests/presentation/screens/create_request_screen.dart';
 import 'features/requests/presentation/screens/requests_list_screen.dart';
 import 'features/announcements/presentation/screens/offers_screen.dart';
+import 'features/chat/captain_support_chat_screen.dart';
 
 final switchToCurrentOrderTab = StateProvider<VoidCallback?>((ref) => null);
 final switchToAvailableOrdersTab = StateProvider<VoidCallback?>((ref) => null);
@@ -214,6 +215,18 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const CaptainOffersScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.support_agent_outlined),
+            title: const Text('الدعم'),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const CaptainSupportChatScreen(),
                 ),
               );
             },

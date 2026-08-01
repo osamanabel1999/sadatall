@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
 import 'package:sadat_delivery_merged/captain/core/config/api_config.dart';
-import 'package:sadat_delivery_merged/main.dart' show rootProviderContainer;
+import 'package:sadat_delivery_merged/main.dart' show rootProviderContainer, navigatorKey;
 import 'package:sadat_delivery_merged/captain/main_navigation.dart'
     show switchToCurrentOrderTab, switchToAvailableOrdersTab;
+import 'package:sadat_delivery_merged/captain/features/chat/captain_support_chat_screen.dart';
 import '../errors/app_exceptions.dart';
 import '../network/api_client.dart';
 
@@ -28,9 +30,15 @@ void _handleCaptainOrderNotification(Map<String, dynamic> data) {
   if (type == null) return;
 
   if (type == 'chat_message') {
-    // Captain only ever chats within an order context (user or vendor side)
-    // — the chat entry buttons live on the current-order screen, so route
-    // there rather than deep-linking into a specific chat thread.
+    final chatId = data['chatId'] as String?;
+    if (chatId != null && chatId.startsWith('support_captain_')) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const CaptainSupportChatScreen()),
+      );
+      return;
+    }
+    // Order-scoped chat (user or vendor side) — the chat entry buttons live
+    // on the current-order screen, so route there.
     rootProviderContainer.read(switchToCurrentOrderTab)?.call();
     return;
   }

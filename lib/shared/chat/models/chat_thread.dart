@@ -1,12 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum ChatType { userAdmin, userCaptain, vendorCaptain, vendorAdmin }
+enum ChatType { userAdmin, userCaptain, vendorCaptain, vendorAdmin, captainAdmin }
 
 const Map<ChatType, String> _chatTypeStrings = {
   ChatType.userAdmin: 'user_admin',
   ChatType.userCaptain: 'user_captain',
   ChatType.vendorCaptain: 'vendor_captain',
   ChatType.vendorAdmin: 'vendor_admin',
+  ChatType.captainAdmin: 'captain_admin',
 };
 
 String chatTypeToString(ChatType type) => _chatTypeStrings[type]!;

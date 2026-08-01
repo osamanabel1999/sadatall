@@ -38,8 +38,10 @@ class ChatRepository {
         return 'support_user_${participant.id}';
       case ChatRole.vendor:
         return 'support_vendor_${participant.id}';
+      case ChatRole.captain:
+        return 'support_captain_${participant.id}';
       default:
-        throw ArgumentError('Only user/vendor have support chats');
+        throw ArgumentError('Only user/vendor/captain have support chats');
     }
   }
 
@@ -51,7 +53,12 @@ class ChatRepository {
 
   Future<ChatThread> getOrCreateSupportChat(ChatParticipant self) async {
     final chatId = supportChatId(self);
-    final type = self.role == ChatRole.user ? ChatType.userAdmin : ChatType.vendorAdmin;
+    final type = switch (self.role) {
+      ChatRole.user => ChatType.userAdmin,
+      ChatRole.vendor => ChatType.vendorAdmin,
+      ChatRole.captain => ChatType.captainAdmin,
+      ChatRole.admin => throw ArgumentError('self must be user/vendor/captain'),
+    };
     final adminParticipantId = ChatParticipant.admin().participantId;
     return _getOrCreate(
       chatId: chatId,
