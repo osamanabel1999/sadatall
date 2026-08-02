@@ -20,8 +20,10 @@ typedef LatLng = ({double lat, double lng});
 
 /// Generic chat screen reused by every mode/chat-type. A mode-specific
 /// wrapper (e.g. lib/user/screens/chat/support_chat_screen.dart) supplies
-/// [openThread] (lazy get-or-create), [self], and the other display bits.
+/// [repository] (shared per mode, so the socket connects once per app
+/// session), [openThread] (lazy get-or-create), [self], and display bits.
 class ChatScreen extends StatefulWidget {
+  final ChatRepository repository;
   final Future<ChatThread> Function() openThread;
   final ChatParticipant self;
   final String otherParticipantId;
@@ -34,6 +36,7 @@ class ChatScreen extends StatefulWidget {
 
   const ChatScreen({
     super.key,
+    required this.repository,
     required this.openThread,
     required this.self,
     required this.otherParticipantId,
@@ -50,17 +53,16 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ChatRepository _repo = ChatRepository();
-  final PresenceService _presence = PresenceService();
+  late final ChatRepository _repo = widget.repository;
+  late final PresenceService _presence = PresenceService(widget.repository.socket);
   final ScrollController _scrollController = ScrollController();
   ChatThread? _thread;
   String? _error;
-  final Set<String> _markedRead = {};
+  bool _markedReadForCurrentUnread = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.showPresence) _presence.start(widget.self.participantId);
     _load();
   }
 
@@ -75,7 +77,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    if (widget.showPresence) _presence.stop();
     _scrollController.dispose();
     super.dispose();
   }
@@ -147,11 +148,6 @@ class _ChatScreenState extends State<ChatScreen> {
         attachmentUrl: result.url,
       );
     } catch (e) {
-      // Covers both the upload call itself throwing (network/auth error not
-      // caught inside the mode's uploader) and the Firestore write throwing
-      // (e.g. permission-denied if firestore.rules haven't been deployed,
-      // or the custom-token sign-in silently failed) — without this, both
-      // failed completely silently: no message sent, no feedback shown.
       _showError('فشل رفع المرفق', e);
     }
   }
@@ -185,14 +181,13 @@ class _ChatScreenState extends State<ChatScreen> {
   void _markReadIfNeeded(List<ChatMessage> messages) {
     final chatId = _thread?.id;
     if (chatId == null) return;
-    final unread = messages
-        .where((m) => m.senderId != widget.self.participantId && !m.readBy.contains(widget.self.participantId))
-        .map((m) => m.id)
-        .where((id) => !_markedRead.contains(id))
-        .toList();
-    if (unread.isEmpty) return;
-    _markedRead.addAll(unread);
-    _repo.markMessagesRead(chatId: chatId, participantId: widget.self.participantId, messageIds: unread);
+    final hasUnread = messages.any((m) => m.senderId != widget.self.participantId && !m.readBy.contains(widget.self.participantId));
+    if (!hasUnread) {
+      _markedReadForCurrentUnread = false;
+      return;
+    }
+    if (_markedReadForCurrentUnread) return;
+    _markedReadForCurrentUnread = true;
     _repo.markThreadRead(chatId, widget.self.participantId);
   }
 

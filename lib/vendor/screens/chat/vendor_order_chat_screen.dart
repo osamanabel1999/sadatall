@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/location_service.dart';
-import '../../../shared/chat/data/chat_repository.dart';
 import '../../../shared/chat/models/chat_participant.dart';
 import '../../../shared/chat/presentation/chat_screen.dart';
 import 'vendor_chat_attachment_uploader.dart';
+import 'vendor_chat_client.dart';
 
 const Color _vendorAccent = Color(0xFFFFC107);
 
@@ -33,13 +33,17 @@ class VendorOrderChatScreen extends StatelessWidget {
 
     final self = ChatParticipant(role: ChatRole.vendor, id: vendor.id, displayName: vendor.vendorName);
     final other = ChatParticipant(role: ChatRole.captain, id: captainId, displayName: captainName);
-    final repo = ChatRepository();
+    final repo = buildVendorChatRepository();
 
     return ChatScreen(
-      openThread: () async {
-        await repo.syncChatStatusToOrderStatus(orderId, orderStatus);
-        return repo.getOrCreateOrderChat(orderId: orderId, self: self, other: other, isVendorSide: true);
-      },
+      repository: repo,
+      openThread: () => repo.getOrCreateOrderChat(
+        orderId: orderId,
+        self: self,
+        other: other,
+        isVendorSide: true,
+        orderStatus: orderStatus,
+      ),
       self: self,
       otherParticipantId: other.participantId,
       title: captainName,

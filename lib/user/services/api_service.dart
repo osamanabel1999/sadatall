@@ -16,6 +16,12 @@ class ApiService {
   final StorageService _storageService = StorageService();
   String? _currentBaseUrl; // Store the current base URL
 
+  /// Currently resolved API base URL — used by the chat feature to derive
+  /// the Socket.io connection URL (same host, no /api suffix).
+  String get baseUrl => _dio.options.baseUrl;
+
+  Future<String?> get accessToken => _storageService.getAccessToken();
+
   void initialize() {
     _initializeInternal();
   }

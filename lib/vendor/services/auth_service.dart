@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
@@ -9,7 +8,6 @@ import 'api_service.dart';
 import 'storage_service.dart';
 import 'notification_service.dart';
 import 'package:dio/dio.dart';
-import '../../shared/chat/data/chat_auth_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -56,8 +54,6 @@ class AuthService {
             ('Error updating FCM token after login: $e');
           }
         }
-
-        unawaited(_signInToChat());
 
         return AuthResult(
           success: true,
@@ -139,8 +135,6 @@ class AuthService {
           }
         }
 
-        unawaited(_signInToChat());
-
         return AuthResult(
           success: true,
           vendor: vendor,
@@ -164,33 +158,14 @@ class AuthService {
     try {
       // await _apiService.post(AppConstants.logoutEndpoint);
       await _storageService.clearAllTokens();
-      await ChatAuthService.signOut();
       return true;
     } catch (e) {
       await _storageService.clearAllTokens();
-      await ChatAuthService.signOut();
       // Log the error for debugging but don't expose it to user
       if (kDebugMode) {
         ('خطأ غير متوقع أثناء تسجيل الخروج: ${e.toString()}');
       }
       return true;
-    }
-  }
-
-  /// Signs into Firebase Auth via a backend-minted custom token so
-  /// Firestore security rules can trust request.auth.uid for the chat
-  /// feature. Best-effort — chat just won't work if this fails.
-  Future<void> _signInToChat() async {
-    try {
-      await ChatAuthService.signIn(() async {
-        final response = await _apiService.post<Map<String, dynamic>>('/auth/firebase-token');
-        if (response.success && response.data != null) {
-          return response.data!['customToken'] as String?;
-        }
-        return null;
-      });
-    } catch (e) {
-      if (kDebugMode) debugPrint('Chat Firebase sign-in failed: $e');
     }
   }
 

@@ -1,14 +1,11 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/network/api_client.dart';
 import '../../../../core/config/api_config.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../../../core/utils/app_utils.dart';
 import '../models/captain_model.dart';
-import '../../../../../shared/chat/data/chat_auth_service.dart';
 
 class AuthService {
   final ApiClient _apiClient = ApiClient();
@@ -64,8 +61,6 @@ class AuthService {
         _apiClient.setAuthToken(result['token']);
         _apiClient.setRefreshToken(result['refreshToken']);
 
-        unawaited(_signInToChat());
-
         return result;
       } else {
         throw Exception(body['error'] ?? 'Registration failed');
@@ -100,12 +95,10 @@ class AuthService {
       // Store tokens securely
       await _storageService.setSecureString(StorageService.keyAuthToken, data['token']);
       await _storageService.setSecureString(StorageService.keyRefreshToken, data['refreshToken']);
-      
+
       // Set tokens in ApiClient
       _apiClient.setAuthToken(data['token']);
       _apiClient.setRefreshToken(data['refreshToken']);
-
-      unawaited(_signInToChat());
 
       return data;
     } else {
@@ -120,24 +113,6 @@ class AuthService {
 
     // Clear tokens from ApiClient
     _apiClient.clearAuthToken();
-    await ChatAuthService.signOut();
-  }
-
-  /// Signs into Firebase Auth via a backend-minted custom token so
-  /// Firestore security rules can trust request.auth.uid for the chat
-  /// feature. Best-effort — chat just won't work if this fails.
-  Future<void> _signInToChat() async {
-    try {
-      await ChatAuthService.signIn(() async {
-        final response = await _apiClient.post<Map<String, dynamic>>('/auth/firebase-token');
-        if (response.success && response.data != null) {
-          return response.data!['customToken'] as String?;
-        }
-        return null;
-      });
-    } catch (e) {
-      if (kDebugMode) debugPrint('Chat Firebase sign-in failed: $e');
-    }
   }
 
   Future<void> deleteAccount() async {
