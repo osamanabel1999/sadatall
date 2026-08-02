@@ -88,6 +88,18 @@ class LocationTrackingService {
         onError: _onLocationError,
       );
 
+      // onLocationChanged (with distanceFilter set) only fires once the
+      // device has actually moved — on login/app-reentry the captain
+      // hasn't moved yet, so without this the server never learns their
+      // current position until their first ~5m of movement. Send one
+      // immediate fix right away instead of waiting for that.
+      try {
+        final current = await _location.getLocation();
+        _onLocationUpdate(current);
+      } catch (e) {
+        ("Error getting initial location: $e");
+      }
+
       _isTracking = true;
       ("Location tracking started");
       return true;
