@@ -522,6 +522,17 @@ class ApiService {
     }
   }
 
+  Future<ApiResponse<dynamic>> getPromoAds() async {
+    try {
+      final response = await _dio.get('/promo-ads/public');
+      return ApiResponse.fromResponse(response);
+    } on DioException catch (e) {
+      return ApiResponse.fromError(e);
+    } catch (e) {
+      return ApiResponse.fromException(e);
+    }
+  }
+
   Future<ApiResponse<dynamic>> updateFCMToken(String token) async {
     try {
       final response = await _dio.put(
