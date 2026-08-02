@@ -3,18 +3,27 @@ class CartItem {
   final String name;
   final double price;
   int quantity;
+  // Which size variant this line represents — null for a product with no
+  // sizes. Two different sizes of the same product are two separate
+  // CartItems (see CartService's dedup key), since they can have
+  // different prices.
+  final String? sizeId;
+  final String? sizeName;
 
   CartItem({
     required this.productId,
     required this.name,
     required this.price,
     required this.quantity,
+    this.sizeId,
+    this.sizeName,
   });
 
   double get subtotal => price * quantity;
 
   String toDescriptionString() {
-    return '$name x$quantity (${subtotal.toStringAsFixed(0)} جنيه)';
+    final label = sizeName != null && sizeName!.isNotEmpty ? '$name ($sizeName)' : name;
+    return '$label x$quantity (${subtotal.toStringAsFixed(0)} جنيه)';
   }
 
   Map<String, dynamic> toJson() {
@@ -23,6 +32,8 @@ class CartItem {
       'name': name,
       'price': price,
       'quantity': quantity,
+      if (sizeId != null) 'sizeId': sizeId,
+      if (sizeName != null) 'sizeName': sizeName,
     };
   }
 
@@ -36,12 +47,14 @@ class CartItem {
       quantity: json['quantity'] is int
           ? json['quantity']
           : int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
+      sizeId: json['sizeId']?.toString(),
+      sizeName: json['sizeName']?.toString(),
     );
   }
 
   @override
   String toString() {
-    return 'CartItem{productId: $productId, name: $name, price: $price, quantity: $quantity}';
+    return 'CartItem{productId: $productId, sizeId: $sizeId, name: $name, price: $price, quantity: $quantity}';
   }
 
   @override
@@ -49,8 +62,9 @@ class CartItem {
       identical(this, other) ||
       other is CartItem &&
           runtimeType == other.runtimeType &&
-          productId == other.productId;
+          productId == other.productId &&
+          sizeId == other.sizeId;
 
   @override
-  int get hashCode => productId.hashCode;
+  int get hashCode => Object.hash(productId, sizeId);
 }

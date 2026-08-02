@@ -1134,9 +1134,12 @@ class _VendorDetailsScreenState extends State<VendorDetailsScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    // Price
+                    // Price (or starting-from price when sizes exist, since
+                    // each size can have a different price)
                     Text(
-                      '${productItem.price.toStringAsFixed(0)} جنيه',
+                      productItem.sizes.isEmpty
+                          ? '${productItem.price.toStringAsFixed(0)} جنيه'
+                          : 'يبدأ من ${_minSizePrice(productItem).toStringAsFixed(0)} جنيه',
                       style: theme.textTheme.titleSmall?.copyWith(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.bold,
@@ -1157,85 +1160,108 @@ class _VendorDetailsScreenState extends State<VendorDetailsScreen> {
                 ),
               ),
 
-              // Counter buttons
+              // Counter buttons (single price) or a size-picker button
+              // (multiple sizes — each has its own price/cart line)
               if (productItem.isAvailable)
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 8,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Minus button
-                      InkWell(
-                        onTap: quantity > 0
-                            ? () => _updateCartItem(productItem, -1)
-                            : null,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: quantity > 0
-                                ? AppTheme.primaryColor
-                                : Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.remove,
-                            color: quantity > 0
-                                ? Colors.white
-                                : Colors.grey[500],
-                            size: 18,
-                          ),
-                        ),
-                      ),
+                  child: productItem.sizes.isEmpty
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Minus button
+                            InkWell(
+                              onTap: quantity > 0
+                                  ? () => _updateCartItem(productItem, -1)
+                                  : null,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: quantity > 0
+                                      ? AppTheme.primaryColor
+                                      : Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.remove,
+                                  color: quantity > 0
+                                      ? Colors.white
+                                      : Colors.grey[500],
+                                  size: 18,
+                                ),
+                              ),
+                            ),
 
-                      // Quantity display
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: quantity > 0
-                              ? AppTheme.primaryColor.withOpacity(0.1)
-                              : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          quantity.toString(),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: quantity > 0
-                                ? AppTheme.primaryColor
-                                : Colors.grey[600],
-                          ),
-                        ),
-                      ),
+                            // Quantity display
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: quantity > 0
+                                    ? AppTheme.primaryColor.withOpacity(0.1)
+                                    : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                quantity.toString(),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: quantity > 0
+                                      ? AppTheme.primaryColor
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            ),
 
-                      // Plus button
-                      InkWell(
-                        onTap: () => _updateCartItem(productItem, 1),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 18,
+                            // Plus button
+                            InkWell(
+                              onTap: () => _updateCartItem(productItem, 1),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showSizePicker(productItem),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.add_shopping_cart, size: 16),
+                            label: Text(
+                              _totalQuantityForProduct(productItem) > 0
+                                  ? 'في السلة (${_totalQuantityForProduct(productItem)}) · اختيار الحجم'
+                                  : 'اختيار الحجم',
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
                 ),
             ],
           ),
@@ -1244,7 +1270,19 @@ class _VendorDetailsScreenState extends State<VendorDetailsScreen> {
     );
   }
 
-  Future<void> _updateCartItem(ProductItem product, int delta) async {
+  double _minSizePrice(ProductItem product) {
+    final available = product.sizes.where((s) => s.isAvailable).toList();
+    final pool = available.isNotEmpty ? available : product.sizes;
+    return pool.map((s) => s.effectivePrice).reduce((a, b) => a < b ? a : b);
+  }
+
+  int _totalQuantityForProduct(ProductItem product) {
+    return _cartService.items
+        .where((item) => item.productId == product.id)
+        .fold(0, (sum, item) => sum + item.quantity);
+  }
+
+  Future<void> _updateCartItem(ProductItem product, int delta, {ItemSizeOption? size}) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isAuthenticated) {
       Navigator.of(context).pushNamed('/login');
@@ -1261,10 +1299,93 @@ class _VendorDetailsScreenState extends State<VendorDetailsScreen> {
     }
 
     if (delta > 0) {
-      _cartService.addItem(product, widget.vendor.id, widget.vendor.vendorName);
+      _cartService.addItem(product, widget.vendor.id, widget.vendor.vendorName, size: size);
     } else {
-      _cartService.removeItem(product.id);
+      _cartService.removeItem(product.id, sizeId: size?.id);
     }
+  }
+
+  Future<void> _showSizePicker(ProductItem product) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) {
+      Navigator.of(context).pushNamed('/login');
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: Theme.of(sheetContext)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final size in product.sizes.where((s) => s.isAvailable))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${size.name} — ${size.effectivePrice.toStringAsFixed(0)} جنيه',
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: _cartService.getItemQuantity(product.id, sizeId: size.id) > 0
+                                ? () async {
+                                    await _updateCartItem(product, -1, size: size);
+                                    setSheetState(() {});
+                                  }
+                                : null,
+                          ),
+                          Text(
+                            '${_cartService.getItemQuantity(product.id, sizeId: size.id)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add_circle, color: AppTheme.primaryColor),
+                            onPressed: () async {
+                              await _updateCartItem(product, 1, size: size);
+                              setSheetState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                      child: const Text('تم'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<bool> _showVendorSwitchDialog() async {

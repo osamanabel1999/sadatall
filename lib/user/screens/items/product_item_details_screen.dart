@@ -202,7 +202,9 @@ class _ProductItemDetailsScreenState extends State<ProductItemDetailsScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${widget.productItem.price.toStringAsFixed(0)} جنيه',
+                          widget.productItem.sizes.isEmpty
+                              ? '${widget.productItem.price.toStringAsFixed(0)} جنيه'
+                              : 'يبدأ من ${widget.productItem.sizes.map((s) => s.effectivePrice).reduce((a, b) => a < b ? a : b).toStringAsFixed(0)} جنيه',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: AppTheme.primaryColor,
                             fontWeight: FontWeight.bold,
@@ -210,6 +212,43 @@ class _ProductItemDetailsScreenState extends State<ProductItemDetailsScreen> {
                         ),
                       ],
                     ),
+
+                  // Sizes (read-only mode only — vendor edits these from
+                  // the vendor app's own product form, not here)
+                  if (!widget.isEditable && widget.productItem.sizes.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'الأحجام المتاحة',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    ...widget.productItem.sizes.map(
+                      (size) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                size.name,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: size.isAvailable ? AppTheme.textPrimary : Colors.grey,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              size.isAvailable
+                                  ? '${size.effectivePrice.toStringAsFixed(0)} جنيه'
+                                  : 'غير متاح',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: size.isAvailable ? AppTheme.primaryColor : Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
 
