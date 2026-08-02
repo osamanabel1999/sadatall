@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../screens/vendors/vendor_details_screen.dart';
 import '../../services/api_service.dart';
+import '../../services/user_vendor_service.dart';
 
 /// Home-screen promo carousel — short marketing cards (title + description
 /// + a CTA button) admin-managed via the "البطاقات الترويجية" screen in the
@@ -17,12 +19,14 @@ class PromoAdCarousel extends StatefulWidget {
 
 class _PromoAdCarouselState extends State<PromoAdCarousel> {
   final ApiService _apiService = ApiService();
+  final UserVendorService _vendorService = UserVendorService();
   final PageController _pageController = PageController(viewportFraction: 0.9);
   Timer? _autoScrollTimer;
 
   List<Map<String, dynamic>> _ads = [];
   int _currentPage = 0;
   bool _loading = true;
+  bool _openingVendor = false;
 
   @override
   void initState() {
@@ -71,11 +75,30 @@ class _PromoAdCarouselState extends State<PromoAdCarousel> {
   }
 
   Future<void> _handleTap(Map<String, dynamic> data) async {
-    final link = data['cta_link'] as String?;
-    if (link == null || link.isEmpty) return;
-    final uri = Uri.tryParse(link);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final linkType = data['link_type'] as String? ?? 'none';
+    if (linkType == 'vendor') {
+      final vendorId = data['vendor_id'] as String?;
+      if (vendorId != null && vendorId.isNotEmpty) await _openVendor(vendorId);
+      return;
+    }
+    if (linkType == 'external') {
+      final link = data['cta_link'] as String?;
+      if (link == null || link.isEmpty) return;
+      final uri = Uri.tryParse(link);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
+  Future<void> _openVendor(String vendorId) async {
+    if (_openingVendor) return;
+    setState(() => _openingVendor = true);
+    final result = await _vendorService.getVendorById(vendorId);
+    if (!mounted) return;
+    setState(() => _openingVendor = false);
+    if (result.success && result.data != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => VendorDetailsScreen(vendor: result.data!)));
     }
   }
 
@@ -90,20 +113,30 @@ class _PromoAdCarouselState extends State<PromoAdCarousel> {
         children: [
           SizedBox(
             height: 150,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _ads.length,
-              onPageChanged: (i) => setState(() => _currentPage = i),
-              itemBuilder: (context, index) {
-                final data = _ads[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: GestureDetector(
-                    onTap: () => _handleTap(data),
-                    child: _PromoAdCard(data: data, color: _parseHex(data['background_color_hex'] as String?)),
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  itemCount: _ads.length,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  itemBuilder: (context, index) {
+                    final data = _ads[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: GestureDetector(
+                        onTap: _openingVendor ? null : () => _handleTap(data),
+                        child: _PromoAdCard(data: data, color: _parseHex(data['background_color_hex'] as String?)),
+                      ),
+                    );
+                  },
+                ),
+                if (_openingVendor)
+                  const Positioned.fill(
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
                   ),
-                );
-              },
+              ],
             ),
           ),
           if (_ads.length > 1) ...[
@@ -142,7 +175,12 @@ class _PromoAdCard extends StatelessWidget {
     final description = data['description'] as String? ?? '';
     final ctaText = data['cta_text'] as String? ?? 'اعرف أكثر';
     final imageUrl = data['image_url'] as String?;
-    final hasLink = (data['cta_link'] as String?)?.isNotEmpty == true;
+    final linkType = data['link_type'] as String? ?? 'none';
+    final hasLink = linkType == 'vendor'
+        ? (data['vendor_id'] as String?)?.isNotEmpty == true
+        : linkType == 'external'
+            ? (data['cta_link'] as String?)?.isNotEmpty == true
+            : false;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),

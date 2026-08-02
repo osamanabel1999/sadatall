@@ -139,6 +139,43 @@ class UserVendorService {
     }
   }
 
+  // Fetches a single vendor by id — used e.g. when a home-screen promo ad
+  // links directly to a vendor's page rather than an external URL.
+  Future<ApiResponse<Vendor>> getVendorById(String vendorId) async {
+    try {
+      final response = await _apiService.get<Map<String, dynamic>>(
+        '${AppConstants.vendorsEndpoint}/$vendorId',
+      );
+
+      if (response.success && response.data != null) {
+        final dataContainer = response.data is Map<String, dynamic> &&
+                response.data!.containsKey('data')
+            ? response.data!['data'] as Map<String, dynamic>?
+            : response.data!;
+
+        if (dataContainer != null) {
+          return ApiResponse<Vendor>(
+            success: true,
+            data: Vendor.fromJson(dataContainer),
+            message: response.message ?? 'تم استرداد بيانات المتجر بنجاح',
+          );
+        }
+      }
+      return ApiResponse<Vendor>(
+        success: false,
+        error: response.error ?? 'فشل في استرداد بيانات المتجر',
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        ('UserVendorService.getVendorById error: $e');
+      }
+      return ApiResponse<Vendor>(
+        success: false,
+        error: 'حدث خطأ أثناء استرداد بيانات المتجر: ${e.toString()}',
+      );
+    }
+  }
+
   Future<ApiResponse<List<MenuItem>>> getVendorMenus(
     String vendorId, {
     int page = 1,
