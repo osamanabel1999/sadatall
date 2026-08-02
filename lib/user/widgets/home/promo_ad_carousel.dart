@@ -75,16 +75,19 @@ class _PromoAdCarouselState extends State<PromoAdCarousel> {
   }
 
   Future<void> _handleTap(Map<String, dynamic> data) async {
-    final vendorId = data['vendor_id'] as String?;
-    if (vendorId != null && vendorId.isNotEmpty) {
-      await _openVendor(vendorId);
+    final linkType = data['link_type'] as String? ?? 'none';
+    if (linkType == 'vendor') {
+      final vendorId = data['vendor_id'] as String?;
+      if (vendorId != null && vendorId.isNotEmpty) await _openVendor(vendorId);
       return;
     }
-    final link = data['cta_link'] as String?;
-    if (link == null || link.isEmpty) return;
-    final uri = Uri.tryParse(link);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (linkType == 'external') {
+      final link = data['cta_link'] as String?;
+      if (link == null || link.isEmpty) return;
+      final uri = Uri.tryParse(link);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     }
   }
 
@@ -172,7 +175,12 @@ class _PromoAdCard extends StatelessWidget {
     final description = data['description'] as String? ?? '';
     final ctaText = data['cta_text'] as String? ?? 'اعرف أكثر';
     final imageUrl = data['image_url'] as String?;
-    final hasLink = (data['cta_link'] as String?)?.isNotEmpty == true || (data['vendor_id'] as String?)?.isNotEmpty == true;
+    final linkType = data['link_type'] as String? ?? 'none';
+    final hasLink = linkType == 'vendor'
+        ? (data['vendor_id'] as String?)?.isNotEmpty == true
+        : linkType == 'external'
+            ? (data['cta_link'] as String?)?.isNotEmpty == true
+            : false;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
