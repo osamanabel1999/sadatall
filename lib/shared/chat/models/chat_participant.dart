@@ -11,8 +11,8 @@ ChatRole chatRoleFromString(String value) {
 
 /// Identifies "who is using the chat right now" — the role + the backend id
 /// for that role (User.id / Vendor.id / Captain.id, or the tenant id for
-/// admin). [participantId] is the flat string stored in Firestore
-/// `participantIds` arrays, e.g. "user_42", "captain_7", "admin_SADAT".
+/// admin). [participantId] is the flat string the backend also uses,
+/// e.g. "user_42", "captain_7", "admin_SADAT".
 class ChatParticipant {
   final ChatRole role;
   final String id;

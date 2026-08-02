@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/location_service.dart';
 import '../auth/presentation/providers/auth_provider.dart';
-import '../../../shared/chat/data/chat_repository.dart';
 import '../../../shared/chat/models/chat_participant.dart';
 import '../../../shared/chat/presentation/chat_screen.dart';
 import 'captain_chat_attachment_uploader.dart';
+import 'captain_chat_client.dart';
 
 /// captain<->admin support chat — one persistent thread, always open.
 /// Reached from the drawer (see lib/captain/main_navigation.dart) since the
@@ -22,9 +22,10 @@ class CaptainSupportChatScreen extends ConsumerWidget {
     }
 
     final self = ChatParticipant(role: ChatRole.captain, id: captain.id, displayName: captain.userName);
-    final repo = ChatRepository();
+    final repo = buildCaptainChatRepository();
 
     return ChatScreen(
+      repository: repo,
       openThread: () => repo.getOrCreateSupportChat(self),
       self: self,
       otherParticipantId: ChatParticipant.admin().participantId,

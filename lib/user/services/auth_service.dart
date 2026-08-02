@@ -1,4 +1,3 @@
-import 'dart:async';
 import '../models/user.dart';
 import '../models/auth_models.dart';
 import '../constants/app_constants.dart';
@@ -7,7 +6,6 @@ import 'storage_service.dart';
 import 'notification_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../../shared/chat/data/chat_auth_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -61,8 +59,6 @@ class AuthService {
             ('Error sending FCM token after login: $e');
           }
         }
-
-        unawaited(_signInToChat());
 
         return AuthResult(
           success: true,
@@ -136,8 +132,6 @@ class AuthService {
           }
         }
 
-        unawaited(_signInToChat());
-
         return AuthResult(
           success: true,
           user: user,
@@ -161,11 +155,9 @@ class AuthService {
     try {
       await _apiService.post(AppConstants.logoutEndpoint);
       await _storageService.clearAllTokens();
-      await ChatAuthService.signOut();
       return true;
     } catch (e) {
       await _storageService.clearAllTokens();
-      await ChatAuthService.signOut();
       return true;
     }
   }
@@ -201,24 +193,5 @@ class AuthService {
 
   Future<User?> getCurrentUser() async {
     return await _storageService.getUserData();
-  }
-
-  /// Signs into Firebase Auth via a backend-minted custom token so
-  /// Firestore security rules can trust request.auth.uid for the chat
-  /// feature. Best-effort — chat just won't work if this fails, everything
-  /// else keeps working normally.
-  Future<void> _signInToChat() async {
-    try {
-      await ChatAuthService.signIn(() async {
-        final response = await _apiService.post<Map<String, dynamic>>('/auth/firebase-token');
-        if (response.success && response.data != null) {
-          final data = response.data!['data'] as Map<String, dynamic>?;
-          return data?['customToken'] as String?;
-        }
-        return null;
-      });
-    } catch (e) {
-      if (kDebugMode) debugPrint('Chat Firebase sign-in failed: $e');
-    }
   }
 }

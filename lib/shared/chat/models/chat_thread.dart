@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 enum ChatType { userAdmin, userCaptain, vendorCaptain, vendorAdmin, captainAdmin }
 
 const Map<ChatType, String> _chatTypeStrings = {
@@ -31,17 +29,6 @@ ChatStatus chatStatusFromString(String value) {
   }
 }
 
-String chatStatusToString(ChatStatus status) {
-  switch (status) {
-    case ChatStatus.readOnly:
-      return 'read_only';
-    case ChatStatus.closed:
-      return 'closed';
-    case ChatStatus.open:
-      return 'open';
-  }
-}
-
 class ChatLastMessage {
   final String text;
   final String type;
@@ -55,27 +42,21 @@ class ChatLastMessage {
     this.sentAt,
   });
 
-  factory ChatLastMessage.fromMap(Map<String, dynamic>? map) {
-    if (map == null) {
+  factory ChatLastMessage.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
       return const ChatLastMessage(text: '', type: 'text', senderId: '');
     }
     return ChatLastMessage(
-      text: map['text'] as String? ?? '',
-      type: map['type'] as String? ?? 'text',
-      senderId: map['senderId'] as String? ?? '',
-      sentAt: (map['sentAt'] as Timestamp?)?.toDate(),
+      text: json['text'] as String? ?? '',
+      type: json['type'] as String? ?? 'text',
+      senderId: json['sender_id'] as String? ?? '',
+      sentAt: json['sent_at'] == null ? null : DateTime.parse(json['sent_at'] as String),
     );
   }
-
-  Map<String, dynamic> toMap() => {
-        'text': text,
-        'type': type,
-        'senderId': senderId,
-        'sentAt': sentAt == null ? FieldValue.serverTimestamp() : Timestamp.fromDate(sentAt!),
-      };
 }
 
-/// Mirrors a `chats/{chatId}` Firestore document.
+/// Mirrors a `chats/{chatId}` row from the backend's REST API
+/// (GET/POST /api/chats/...).
 class ChatThread {
   final String id;
   final ChatType type;
@@ -84,7 +65,7 @@ class ChatThread {
   final List<String> participantIds;
   final ChatStatus status;
   final ChatLastMessage lastMessage;
-  final Map<String, int> unreadCount;
+  final int unreadCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -101,21 +82,33 @@ class ChatThread {
     this.updatedAt,
   });
 
-  int unreadFor(String participantId) => unreadCount[participantId] ?? 0;
-
-  factory ChatThread.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? <String, dynamic>{};
+  factory ChatThread.fromJson(Map<String, dynamic> json) {
     return ChatThread(
-      id: doc.id,
-      type: chatTypeFromString(data['type'] as String? ?? 'user_admin'),
-      tenantId: data['tenantId'] as String? ?? 'SADAT',
-      orderId: data['orderId'] as String?,
-      participantIds: List<String>.from(data['participantIds'] as List? ?? const []),
-      status: chatStatusFromString(data['status'] as String? ?? 'open'),
-      lastMessage: ChatLastMessage.fromMap(data['lastMessage'] as Map<String, dynamic>?),
-      unreadCount: Map<String, int>.from(data['unreadCount'] as Map? ?? const {}),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      id: json['id'] as String,
+      type: chatTypeFromString(json['type'] as String? ?? 'user_admin'),
+      tenantId: json['tenant_id'] as String? ?? 'SADAT',
+      orderId: json['order_id'] as String?,
+      participantIds: List<String>.from(json['participant_ids'] as List? ?? const []),
+      status: chatStatusFromString(json['status'] as String? ?? 'open'),
+      lastMessage: ChatLastMessage.fromJson(json['last_message'] as Map<String, dynamic>?),
+      unreadCount: json['unread_count'] as int? ?? 0,
+      createdAt: json['created_at'] == null ? null : DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] == null ? null : DateTime.parse(json['updated_at'] as String),
+    );
+  }
+
+  ChatThread copyWith({ChatStatus? status, int? unreadCount, ChatLastMessage? lastMessage, DateTime? updatedAt}) {
+    return ChatThread(
+      id: id,
+      type: type,
+      tenantId: tenantId,
+      orderId: orderId,
+      participantIds: participantIds,
+      status: status ?? this.status,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

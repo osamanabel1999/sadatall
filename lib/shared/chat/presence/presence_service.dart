@@ -1,86 +1,72 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/widgets.dart';
+import '../data/chat_socket_client.dart';
 
-/// Firestore-only presence approximation: a heartbeat doc updated every ~20s
-/// while foregrounded, plus a typing flag debounced on composer input.
-/// This is not a true `onDisconnect` presence system (that needs Realtime
-/// Database) — "online" reads as "seen in the last ~45s", which is good
-/// enough for the spec's "متصل الآن/آخر ظهور" requirement.
-class PresenceService with WidgetsBindingObserver {
-  PresenceService({FirebaseFirestore? firestore}) : _db = firestore ?? FirebaseFirestore.instance;
+/// Presence/typing over the shared Socket.io connection — "online" is
+/// simply "has an active socket connection" (tracked server-side), so
+/// unlike the old Firestore heartbeat-doc approach there's nothing to
+/// write here, only to listen to.
+class PresenceService {
+  PresenceService(this._socket);
 
-  final FirebaseFirestore _db;
-  Timer? _heartbeat;
-  String? _participantId;
+  final ChatSocketClient _socket;
   Timer? _typingDebounce;
   String? _typingChatId;
 
-  DocumentReference<Map<String, dynamic>> _doc(String participantId) =>
-      _db.collection('presence').doc(participantId);
-
-  void start(String participantId) {
-    _participantId = participantId;
-    WidgetsBinding.instance.addObserver(this);
-    _beat();
-    _heartbeat = Timer.periodic(const Duration(seconds: 20), (_) => _beat());
-  }
-
-  void stop() {
-    WidgetsBinding.instance.removeObserver(this);
-    _heartbeat?.cancel();
-    _typingDebounce?.cancel();
-    final id = _participantId;
-    if (id != null) {
-      _doc(id).set({'online': false, 'lastActiveAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-    }
-  }
-
-  void _beat() {
-    final id = _participantId;
-    if (id == null) return;
-    _doc(id).set({'online': true, 'lastActiveAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    final id = _participantId;
-    if (id == null) return;
-    final online = state == AppLifecycleState.resumed;
-    _doc(id).set({'online': online, 'lastActiveAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-  }
-
-  /// Call on every composer text change; debounces writes and auto-clears
-  /// after 4s of no typing.
+  /// Call on every composer text change; debounced so it doesn't emit on
+  /// every keystroke.
   void setTyping(String chatId) {
-    final id = _participantId;
-    if (id == null) return;
+    if (_typingDebounce != null && _typingChatId == chatId) return;
     _typingChatId = chatId;
-    _typingDebounce?.cancel();
-    _doc(id).set({'typingInChatId': chatId}, SetOptions(merge: true));
-    _typingDebounce = Timer(const Duration(seconds: 4), clearTyping);
+    _socket.emitTyping(chatId);
+    _typingDebounce = Timer(const Duration(seconds: 2), () {
+      _typingDebounce = null;
+    });
   }
 
-  void clearTyping() {
-    final id = _participantId;
-    if (id == null || _typingChatId == null) return;
-    _doc(id).set({'typingInChatId': null}, SetOptions(merge: true));
-    _typingChatId = null;
-  }
-
+  /// True while [otherParticipantId] is typing in [chatId] — auto-clears
+  /// ~3s after the last "typing" event since the server doesn't send an
+  /// explicit "stopped typing" event.
   Stream<bool> otherIsTyping(String otherParticipantId, String chatId) {
-    return _doc(otherParticipantId).snapshots().map((s) => s.data()?['typingInChatId'] == chatId);
+    late StreamController<bool> controller;
+    StreamSubscription? sub;
+    Timer? clearTimer;
+
+    controller = StreamController<bool>.broadcast(
+      onListen: () {
+        controller.add(false);
+        sub = _socket.typingEvents.listen((data) {
+          if (data['chatId'] != chatId || data['participantId'] != otherParticipantId) return;
+          controller.add(true);
+          clearTimer?.cancel();
+          clearTimer = Timer(const Duration(seconds: 3), () {
+            if (!controller.isClosed) controller.add(false);
+          });
+        });
+      },
+      onCancel: () {
+        sub?.cancel();
+        clearTimer?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   Stream<({bool online, DateTime? lastActiveAt})> presenceOf(String participantId) {
-    return _doc(participantId).snapshots().map((s) {
-      final data = s.data();
-      final ts = data?['lastActiveAt'] as Timestamp?;
-      final lastActiveAt = ts?.toDate();
-      final online = data?['online'] == true &&
-          lastActiveAt != null &&
-          DateTime.now().difference(lastActiveAt) < const Duration(seconds: 45);
-      return (online: online, lastActiveAt: lastActiveAt);
-    });
+    late StreamController<({bool online, DateTime? lastActiveAt})> controller;
+    StreamSubscription? sub;
+
+    controller = StreamController.broadcast(
+      onListen: () {
+        // No initial snapshot endpoint — starts "unknown"/offline until the
+        // first presence event for this participant arrives.
+        controller.add((online: false, lastActiveAt: null));
+        sub = _socket.presenceEvents.listen((data) {
+          if (data['participantId'] != participantId) return;
+          controller.add((online: data['online'] == true, lastActiveAt: DateTime.now()));
+        });
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream;
   }
 }

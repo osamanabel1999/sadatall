@@ -6,6 +6,7 @@ import '../models/chat_thread.dart';
 /// a mode can have more than one active/past chat at once (e.g. a captain's
 /// order-scoped chats across several deliveries).
 class ChatListScreen extends StatelessWidget {
+  final ChatRepository repository;
   final String participantId;
   final String title;
   final Color accentColor;
@@ -14,6 +15,7 @@ class ChatListScreen extends StatelessWidget {
 
   const ChatListScreen({
     super.key,
+    required this.repository,
     required this.participantId,
     required this.title,
     required this.accentColor,
@@ -23,11 +25,10 @@ class ChatListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final repo = ChatRepository();
     return Scaffold(
       appBar: AppBar(title: Text(title), backgroundColor: accentColor, foregroundColor: Colors.white),
       body: StreamBuilder<List<ChatThread>>(
-        stream: repo.streamThreadsFor(participantId),
+        stream: repository.streamThreadsFor(participantId),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final threads = snapshot.data!;
@@ -39,7 +40,7 @@ class ChatListScreen extends StatelessWidget {
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final thread = threads[index];
-              final unread = thread.unreadFor(participantId);
+              final unread = thread.unreadCount;
               return ListTile(
                 leading: CircleAvatar(backgroundColor: accentColor.withOpacity(0.15), child: Icon(Icons.chat_bubble, color: accentColor)),
                 title: Text(threadTitleBuilder(thread)),

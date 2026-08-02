@@ -26,6 +26,7 @@ dependencies:
   # HTTP and API
   http: ^1.1.2
   dio: ^5.4.3+1
+  socket_io_client: ^2.0.3+1
 
   # Storage
   shared_preferences: ^2.2.3
@@ -51,10 +52,11 @@ dependencies:
   # AWS S3 / Wasabi
   minio: ^3.5.8
 
-  # Firebase
+  # Firebase (messaging for push notifications, Firestore for app-config
+  # docs like base_url/force-update — NOT used for chat storage anymore,
+  # that moved to Postgres via the backend REST API + Socket.io)
   firebase_core: ^3.13.1
   firebase_messaging: ^15.2.5
-  firebase_auth: ^5.5.2
   cloud_firestore: ^5.6.6
   flutter_local_notifications: ^19.4.1
 

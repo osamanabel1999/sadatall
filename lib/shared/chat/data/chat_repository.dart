@@ -1,72 +1,33 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../models/chat_message.dart';
 import '../models/chat_participant.dart';
 import '../models/chat_thread.dart';
+import 'chat_api_client.dart';
+import 'chat_socket_client.dart';
 
 /// Order lifecycle statuses that gate order-scoped chats, mirrored from the
-/// backend's shared Order status constants (see e.g.
-/// lib/vendor/models/order.dart, lib/captain/features/orders/data/models/order_model.dart).
+/// backend's shared Order status constants.
 class OrderChatTrigger {
   static const String opensOn = 'ACCEPTED_BY_CAPTAIN';
   static const String closesOn = 'DELIVERED';
 }
 
-/// Firestore-backed data layer for the whole chat feature. Shared by every
-/// mode (user/vendor/captain) and every chat type (support / order-scoped).
+/// Backend REST + Socket.io data layer for the chat feature (Postgres-backed
+/// — see backend/src/services/chatService.js). One instance per mode,
+/// shared across every chat screen in that mode so the underlying socket
+/// connection is opened once per app session, not once per screen.
 class ChatRepository {
-  ChatRepository({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  ChatRepository({required this.api, required this.socket});
 
-  final FirebaseFirestore _db;
-
-  CollectionReference<Map<String, dynamic>> get _chats => _db.collection('chats');
-
-  CollectionReference<Map<String, dynamic>> _messagesOf(String chatId) =>
-      _chats.doc(chatId).collection('messages');
-
-  /// All three Flutter modes hardcode this same tenant id today
-  /// (AppConstants.tenantId = 'SADAT' in user/vendor; captain has no
-  /// multi-tenant concept yet). Stored on each chat doc so the backend's
-  /// FCM dispatcher can look up the right tenant-scoped actor.
-  static const String defaultTenantId = 'SADAT';
-
-  // ── chatId builders ──────────────────────────────────────────────────────
-
-  static String supportChatId(ChatParticipant participant) {
-    switch (participant.role) {
-      case ChatRole.user:
-        return 'support_user_${participant.id}';
-      case ChatRole.vendor:
-        return 'support_vendor_${participant.id}';
-      case ChatRole.captain:
-        return 'support_captain_${participant.id}';
-      default:
-        throw ArgumentError('Only user/vendor/captain have support chats');
-    }
-  }
-
-  static String orderChatId(String orderId, {required bool isVendorSide}) {
-    return isVendorSide ? 'order_${orderId}_vendor_captain' : 'order_${orderId}_user_captain';
-  }
+  final ChatApiClient api;
+  final ChatSocketClient socket;
 
   // ── thread lookup / lazy creation ────────────────────────────────────────
 
   Future<ChatThread> getOrCreateSupportChat(ChatParticipant self) async {
-    final chatId = supportChatId(self);
-    final type = switch (self.role) {
-      ChatRole.user => ChatType.userAdmin,
-      ChatRole.vendor => ChatType.vendorAdmin,
-      ChatRole.captain => ChatType.captainAdmin,
-      ChatRole.admin => throw ArgumentError('self must be user/vendor/captain'),
-    };
-    final adminParticipantId = ChatParticipant.admin().participantId;
-    return _getOrCreate(
-      chatId: chatId,
-      type: type,
-      orderId: null,
-      participantIds: [self.participantId, adminParticipantId],
-      initialStatus: ChatStatus.open,
-    );
+    await socket.ensureConnected();
+    final json = await api.post('/chats/support');
+    return ChatThread.fromJson(json);
   }
 
   Future<ChatThread> getOrCreateOrderChat({
@@ -74,91 +35,107 @@ class ChatRepository {
     required ChatParticipant self,
     required ChatParticipant other,
     required bool isVendorSide,
+    String? orderStatus,
   }) async {
-    final chatId = orderChatId(orderId, isVendorSide: isVendorSide);
-    final type = isVendorSide ? ChatType.vendorCaptain : ChatType.userCaptain;
-    return _getOrCreate(
-      chatId: chatId,
-      type: type,
-      orderId: orderId,
-      participantIds: [self.participantId, other.participantId],
-      initialStatus: ChatStatus.open,
-    );
-  }
-
-  Future<ChatThread> _getOrCreate({
-    required String chatId,
-    required ChatType type,
-    required String? orderId,
-    required List<String> participantIds,
-    required ChatStatus initialStatus,
-  }) async {
-    final ref = _chats.doc(chatId);
-    final snap = await ref.get();
-    if (snap.exists) {
-      return ChatThread.fromSnapshot(snap);
-    }
-    final now = FieldValue.serverTimestamp();
-    await ref.set({
-      'type': chatTypeToString(type),
-      'tenantId': defaultTenantId,
+    await socket.ensureConnected();
+    final json = await api.post('/chats/order', body: {
       'orderId': orderId,
-      'participantIds': participantIds,
-      'status': chatStatusToString(initialStatus),
-      'lastMessage': {'text': '', 'type': 'text', 'senderId': '', 'sentAt': now},
-      'unreadCount': {for (final id in participantIds) id: 0},
-      'createdAt': now,
-      'updatedAt': now,
+      'isVendorSide': isVendorSide,
+      'otherRole': other.role.name,
+      'otherId': other.id,
+      if (orderStatus != null) 'orderStatus': orderStatus,
     });
-    final created = await ref.get();
-    return ChatThread.fromSnapshot(created);
-  }
-
-  /// Flips an order-scoped chat's status when the order transitions, e.g.
-  /// read-only once the order is DELIVERED. Safe to call even if the chat
-  /// doesn't exist yet (no-op) — chats are created lazily on first message.
-  Future<void> syncChatStatusToOrderStatus(String orderId, String orderStatus) async {
-    ChatStatus? next;
-    if (orderStatus == OrderChatTrigger.closesOn) {
-      next = ChatStatus.readOnly;
-    } else if (orderStatus == OrderChatTrigger.opensOn) {
-      next = ChatStatus.open;
-    }
-    if (next == null) return;
-
-    for (final chatId in [
-      orderChatId(orderId, isVendorSide: false),
-      orderChatId(orderId, isVendorSide: true),
-    ]) {
-      final ref = _chats.doc(chatId);
-      final snap = await ref.get();
-      if (!snap.exists) continue;
-      await ref.update({'status': chatStatusToString(next), 'updatedAt': FieldValue.serverTimestamp()});
-    }
+    return ChatThread.fromJson(json);
   }
 
   // ── streams ───────────────────────────────────────────────────────────────
 
-  Stream<ChatThread?> streamChat(String chatId) {
-    return _chats.doc(chatId).snapshots().map((s) => s.exists ? ChatThread.fromSnapshot(s) : null);
-  }
-
+  /// Full message list for a chat, newest first — re-emits on every
+  /// new_message socket event (matching the old Firestore snapshot
+  /// semantics so chat_screen.dart didn't need to change its StreamBuilder
+  /// usage).
   Stream<List<ChatMessage>> streamMessages(String chatId, {int limit = 200}) {
-    return _messagesOf(chatId)
-        .orderBy('sentAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((qs) => qs.docs.map(ChatMessage.fromSnapshot).toList());
+    late StreamController<List<ChatMessage>> controller;
+    StreamSubscription? sub;
+    final byId = <String, ChatMessage>{};
+
+    void emit() {
+      final list = byId.values.toList()..sort((a, b) => b.id.compareTo(a.id));
+      if (!controller.isClosed) controller.add(list);
+    }
+
+    controller = StreamController<List<ChatMessage>>.broadcast(
+      onListen: () async {
+        socket.joinChat(chatId);
+        sub = socket.newMessages.listen((data) {
+          if (data['chatId'] != chatId) return;
+          final message = ChatMessage.fromJson(Map<String, dynamic>.from(data['message'] as Map));
+          byId[message.id] = message;
+          emit();
+        });
+        try {
+          final json = await api.get('/chats/$chatId/messages', query: {'limit': limit.toString()});
+          final list = (json['messages'] as List).map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m as Map)));
+          for (final m in list) {
+            byId[m.id] = m;
+          }
+          emit();
+        } catch (_) {
+          // Leave the stream open — a later socket event or retry can still
+          // populate it; the UI shows a spinner until the first emit.
+        }
+      },
+      onCancel: () {
+        sub?.cancel();
+        socket.leaveChat(chatId);
+      },
+    );
+    return controller.stream;
   }
 
-  /// All threads a participant is in, newest activity first — powers a
-  /// chat-list / inbox screen.
+  /// All threads the current user is a participant in, newest activity
+  /// first.
   Stream<List<ChatThread>> streamThreadsFor(String participantId) {
-    return _chats
-        .where('participantIds', arrayContains: participantId)
-        .orderBy('updatedAt', descending: true)
-        .snapshots()
-        .map((qs) => qs.docs.map(ChatThread.fromSnapshot).toList());
+    late StreamController<List<ChatThread>> controller;
+    StreamSubscription? threadSub;
+    StreamSubscription? messageSub;
+    final byId = <String, ChatThread>{};
+
+    void emit() {
+      final list = byId.values.toList()
+        ..sort((a, b) => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)));
+      if (!controller.isClosed) controller.add(list);
+    }
+
+    Future<void> refresh() async {
+      try {
+        final json = await api.get('/chats');
+        final list = (json['threads'] as List).map((t) => ChatThread.fromJson(Map<String, dynamic>.from(t as Map)));
+        byId.clear();
+        for (final t in list) {
+          byId[t.id] = t;
+        }
+        emit();
+      } catch (_) {}
+    }
+
+    controller = StreamController<List<ChatThread>>.broadcast(
+      onListen: () async {
+        await socket.ensureConnected();
+        threadSub = socket.threadUpdates.listen((_) => refresh());
+        // A brand-new chat's first message also means a brand-new thread
+        // this participant may not have in `byId` yet — cheapest correct
+        // fix is just re-fetching the list rather than tracking creation
+        // separately.
+        messageSub = socket.newMessages.listen((_) => refresh());
+        await refresh();
+      },
+      onCancel: () {
+        threadSub?.cancel();
+        messageSub?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   // ── sending ───────────────────────────────────────────────────────────────
@@ -167,7 +144,7 @@ class ChatRepository {
     required String chatId,
     required ChatParticipant sender,
     required String text,
-  }) => _sendMessage(chatId: chatId, sender: sender, type: MessageType.text, text: text, previewText: text);
+  }) => api.post('/chats/$chatId/messages', body: {'type': 'text', 'text': text});
 
   Future<void> sendAttachmentMessage({
     required String chatId,
@@ -176,127 +153,42 @@ class ChatRepository {
     required String attachmentKey,
     String? attachmentUrl,
     String? caption,
-  }) {
-    const previewByType = {
-      MessageType.image: '📷 صورة',
-      MessageType.voice: '🎤 رسالة صوتية',
-      MessageType.file: '📄 ملف',
-      MessageType.video: '🎬 فيديو',
-    };
-    return _sendMessage(
-      chatId: chatId,
-      sender: sender,
-      type: type,
-      text: caption,
-      attachmentKey: attachmentKey,
-      attachmentUrl: attachmentUrl,
-      previewText: previewByType[type] ?? 'مرفق',
-    );
-  }
+  }) => api.post('/chats/$chatId/messages', body: {
+        'type': messageTypeToString(type),
+        if (caption != null) 'text': caption,
+        'attachmentKey': attachmentKey,
+        'attachmentUrl': attachmentUrl,
+      });
 
   Future<void> sendLocationMessage({
     required String chatId,
     required ChatParticipant sender,
     required double lat,
     required double lng,
-  }) => _sendMessage(
-        chatId: chatId,
-        sender: sender,
-        type: MessageType.location,
-        location: ChatLocation(lat: lat, lng: lng),
-        previewText: '📍 موقع',
-      );
+  }) => api.post('/chats/$chatId/messages', body: {
+        'type': 'location',
+        'location': {'lat': lat, 'lng': lng},
+      });
 
   Future<void> sendOrderRefMessage({
     required String chatId,
     required ChatParticipant sender,
     required OrderRef orderRef,
-  }) => _sendMessage(
-        chatId: chatId,
-        sender: sender,
-        type: MessageType.orderRef,
-        orderRef: orderRef,
-        previewText: '🧾 طلب #${orderRef.orderNumber}',
-      );
-
-  Future<void> _sendMessage({
-    required String chatId,
-    required ChatParticipant sender,
-    required MessageType type,
-    required String previewText,
-    String? text,
-    String? attachmentKey,
-    String? attachmentUrl,
-    ChatLocation? location,
-    OrderRef? orderRef,
-  }) async {
-    final chatRef = _chats.doc(chatId);
-    final now = FieldValue.serverTimestamp();
-
-    final messageData = <String, dynamic>{
-      'senderId': sender.participantId,
-      'senderRole': sender.role.name,
-      'type': messageTypeToString(type),
-      'text': text,
-      'attachmentKey': attachmentKey,
-      'attachmentUrl': attachmentUrl,
-      'location': location?.toMap(),
-      'orderRef': orderRef?.toMap(),
-      'sentAt': now,
-      'readBy': [sender.participantId],
-      'isDeleted': false,
-    };
-
-    final batch = _db.batch();
-    batch.set(_messagesOf(chatId).doc(), messageData);
-
-    final chatSnap = await chatRef.get();
-    final participantIds = List<String>.from(chatSnap.data()?['participantIds'] as List? ?? const []);
-    final unread = Map<String, dynamic>.from(chatSnap.data()?['unreadCount'] as Map? ?? const {});
-    for (final id in participantIds) {
-      if (id == sender.participantId) continue;
-      unread[id] = ((unread[id] as int?) ?? 0) + 1;
-    }
-
-    batch.update(chatRef, {
-      'lastMessage': {
-        'text': text ?? previewText,
-        'type': messageTypeToString(type),
-        'senderId': sender.participantId,
-        'sentAt': now,
-      },
-      'unreadCount': unread,
-      'updatedAt': now,
-    });
-
-    await batch.commit();
-  }
+  }) => api.post('/chats/$chatId/messages', body: {
+        'type': 'order_ref',
+        'orderRef': {
+          'orderId': orderRef.orderId,
+          'orderNumber': orderRef.orderNumber,
+          'statusSnapshot': orderRef.statusSnapshot,
+        },
+      });
 
   // ── read receipts / typing ──────────────────────────────────────────────
 
-  Future<void> markThreadRead(String chatId, String participantId) async {
-    await _chats.doc(chatId).update({'unreadCount.$participantId': 0});
-  }
+  /// Marks every message in the chat read up to now for [participantId].
+  /// Per-message read state is derived server-side from this timestamp, so
+  /// there's no separate "mark these message ids read" call needed anymore.
+  Future<void> markThreadRead(String chatId, String participantId) => api.put('/chats/$chatId/read');
 
-  Future<void> markMessagesRead({
-    required String chatId,
-    required String participantId,
-    required List<String> messageIds,
-  }) async {
-    if (messageIds.isEmpty) return;
-    final batch = _db.batch();
-    for (final id in messageIds) {
-      batch.update(_messagesOf(chatId).doc(id), {
-        'readBy': FieldValue.arrayUnion([participantId]),
-      });
-    }
-    await batch.commit();
-  }
-
-  Future<void> softDeleteMessage(String chatId, String messageId) async {
-    await _messagesOf(chatId).doc(messageId).update({
-      'isDeleted': true,
-      'deletedAt': FieldValue.serverTimestamp(),
-    });
-  }
+  Future<void> softDeleteMessage(String chatId, String messageId) => api.delete('/chats/$chatId/messages/$messageId');
 }

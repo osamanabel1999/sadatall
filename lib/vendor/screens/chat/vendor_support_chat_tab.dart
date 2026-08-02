@@ -4,11 +4,11 @@ import '../../providers/auth_provider.dart';
 import '../../services/location_service.dart';
 import '../../services/order_service.dart';
 import '../orders/order_details_screen.dart';
-import '../../../shared/chat/data/chat_repository.dart';
 import '../../../shared/chat/models/chat_message.dart';
 import '../../../shared/chat/models/chat_participant.dart';
 import '../../../shared/chat/presentation/chat_screen.dart';
 import 'vendor_chat_attachment_uploader.dart';
+import 'vendor_chat_client.dart';
 
 const Color _vendorAccent = Color(0xFFFFC107);
 
@@ -26,9 +26,10 @@ class VendorSupportChatTab extends StatelessWidget {
     }
 
     final self = ChatParticipant(role: ChatRole.vendor, id: vendor.id, displayName: vendor.vendorName);
-    final repo = ChatRepository();
+    final repo = buildVendorChatRepository();
 
     return ChatScreen(
+      repository: repo,
       openThread: () => repo.getOrCreateSupportChat(self),
       self: self,
       otherParticipantId: ChatParticipant.admin().participantId,

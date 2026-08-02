@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'chat_participant.dart';
 
 enum MessageType { text, image, voice, location, orderRef, file, video, system }
@@ -27,10 +26,10 @@ class ChatLocation {
   final double lng;
   const ChatLocation({required this.lat, required this.lng});
 
-  factory ChatLocation.fromMap(Map<String, dynamic> map) =>
-      ChatLocation(lat: (map['lat'] as num).toDouble(), lng: (map['lng'] as num).toDouble());
+  factory ChatLocation.fromJson(Map<String, dynamic> json) =>
+      ChatLocation(lat: (json['lat'] as num).toDouble(), lng: (json['lng'] as num).toDouble());
 
-  Map<String, dynamic> toMap() => {'lat': lat, 'lng': lng};
+  Map<String, dynamic> toJson() => {'lat': lat, 'lng': lng};
 }
 
 class OrderRef {
@@ -44,20 +43,21 @@ class OrderRef {
     required this.statusSnapshot,
   });
 
-  factory OrderRef.fromMap(Map<String, dynamic> map) => OrderRef(
-        orderId: map['orderId'] as String? ?? '',
-        orderNumber: map['orderNumber'] as String? ?? '',
-        statusSnapshot: map['statusSnapshot'] as String? ?? '',
+  factory OrderRef.fromJson(Map<String, dynamic> json) => OrderRef(
+        orderId: json['order_id'] as String? ?? '',
+        orderNumber: json['order_number'] as String? ?? '',
+        statusSnapshot: json['status_snapshot'] as String? ?? '',
       );
 
-  Map<String, dynamic> toMap() => {
+  Map<String, dynamic> toJson() => {
         'orderId': orderId,
         'orderNumber': orderNumber,
         'statusSnapshot': statusSnapshot,
       };
 }
 
-/// Mirrors a `chats/{chatId}/messages/{messageId}` Firestore document.
+/// Mirrors a `chat_messages` row from the backend's REST API / socket
+/// events (GET /api/chats/:chatId/messages, "new_message" socket event).
 class ChatMessage {
   final String id;
   final String senderId;
@@ -87,23 +87,22 @@ class ChatMessage {
     this.isDeleted = false,
   });
 
-  factory ChatMessage.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? <String, dynamic>{};
-    final locationMap = data['location'] as Map<String, dynamic>?;
-    final orderRefMap = data['orderRef'] as Map<String, dynamic>?;
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final locationJson = json['location'] as Map<String, dynamic>?;
+    final orderRefJson = json['order_ref'] as Map<String, dynamic>?;
     return ChatMessage(
-      id: doc.id,
-      senderId: data['senderId'] as String? ?? '',
-      senderRole: chatRoleFromString(data['senderRole'] as String? ?? 'user'),
-      type: messageTypeFromString(data['type'] as String? ?? 'text'),
-      text: data['text'] as String?,
-      attachmentKey: data['attachmentKey'] as String?,
-      attachmentUrl: data['attachmentUrl'] as String?,
-      location: locationMap == null ? null : ChatLocation.fromMap(locationMap),
-      orderRef: orderRefMap == null ? null : OrderRef.fromMap(orderRefMap),
-      sentAt: (data['sentAt'] as Timestamp?)?.toDate(),
-      readBy: List<String>.from(data['readBy'] as List? ?? const []),
-      isDeleted: data['isDeleted'] as bool? ?? false,
+      id: json['id'] as String,
+      senderId: json['sender_id'] as String? ?? '',
+      senderRole: chatRoleFromString(json['sender_role'] as String? ?? 'user'),
+      type: messageTypeFromString(json['type'] as String? ?? 'text'),
+      text: json['text'] as String?,
+      attachmentKey: json['attachment_key'] as String?,
+      attachmentUrl: json['attachment_url'] as String?,
+      location: locationJson == null ? null : ChatLocation.fromJson(locationJson),
+      orderRef: orderRefJson == null ? null : OrderRef.fromJson(orderRefJson),
+      sentAt: json['sent_at'] == null ? null : DateTime.parse(json['sent_at'] as String),
+      readBy: List<String>.from(json['read_by'] as List? ?? const []),
+      isDeleted: json['is_deleted'] as bool? ?? false,
     );
   }
 }
