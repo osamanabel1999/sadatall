@@ -25,9 +25,9 @@ class CartService extends ChangeNotifier {
     return _items.fold(0.0, (sum, item) => sum + item.subtotal);
   }
 
-  int getItemQuantity(String productId) {
+  int getItemQuantity(String productId, {String? sizeId}) {
     final item = _items.firstWhere(
-      (item) => item.productId == productId,
+      (item) => item.productId == productId && item.sizeId == sizeId,
       orElse: () => CartItem(productId: '', name: '', price: 0, quantity: 0),
     );
     return item.quantity;
@@ -44,15 +44,19 @@ class CartService extends ChangeNotifier {
     if (_items.isEmpty) {
       return '';
     }
-    
+
     final descriptions = _items.map((item) => item.toDescriptionString()).toList();
     final itemsDescription = descriptions.join('\n');
     final total = getTotalItemsPrice();
-    
+
     return '$itemsDescription\n-----\nالإجمالي: ${total.toStringAsFixed(0)} ج.م';
   }
 
-  void addItem(ProductItem product, String vendorId, String vendorName) {
+  /// [size], when given, picks which ItemSizeOption this line represents —
+  /// its (discount) price is used instead of the product's base price, and
+  /// it's tracked as its own cart line separate from other sizes of the
+  /// same product.
+  void addItem(ProductItem product, String vendorId, String vendorName, {ItemSizeOption? size}) {
     // Set vendor if cart is empty
     if (_items.isEmpty) {
       _vendorId = vendorId;
@@ -61,7 +65,7 @@ class CartService extends ChangeNotifier {
 
     // Check if item already exists
     final existingIndex = _items.indexWhere(
-      (item) => item.productId == product.id,
+      (item) => item.productId == product.id && item.sizeId == size?.id,
     );
 
     if (existingIndex >= 0) {
@@ -72,17 +76,19 @@ class CartService extends ChangeNotifier {
       _items.add(CartItem(
         productId: product.id,
         name: product.name,
-        price: product.price,
+        price: size?.effectivePrice ?? product.price,
         quantity: 1,
+        sizeId: size?.id,
+        sizeName: size?.name,
       ));
     }
 
     notifyListeners();
   }
 
-  void removeItem(String productId) {
+  void removeItem(String productId, {String? sizeId}) {
     final existingIndex = _items.indexWhere(
-      (item) => item.productId == productId,
+      (item) => item.productId == productId && item.sizeId == sizeId,
     );
 
     if (existingIndex >= 0) {
@@ -111,11 +117,11 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateItemQuantity(String productId, int newQuantity) {
+  void updateItemQuantity(String productId, int newQuantity, {String? sizeId}) {
     if (newQuantity <= 0) {
       // Remove item if quantity is 0 or less
-      _items.removeWhere((item) => item.productId == productId);
-      
+      _items.removeWhere((item) => item.productId == productId && item.sizeId == sizeId);
+
       // Clear vendor if cart is empty
       if (_items.isEmpty) {
         _vendorId = null;
@@ -123,7 +129,7 @@ class CartService extends ChangeNotifier {
       }
     } else {
       final existingIndex = _items.indexWhere(
-        (item) => item.productId == productId,
+        (item) => item.productId == productId && item.sizeId == sizeId,
       );
 
       if (existingIndex >= 0) {

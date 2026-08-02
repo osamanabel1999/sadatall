@@ -899,7 +899,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${item.name} x${item.quantity}',
+                                      item.sizeName != null
+                                          ? '${item.name} (${item.sizeName}) x${item.quantity}'
+                                          : '${item.name} x${item.quantity}',
                                       style: theme.textTheme.bodyMedium,
                                     ),
                                   ),
