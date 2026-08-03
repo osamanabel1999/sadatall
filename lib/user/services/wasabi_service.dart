@@ -25,55 +25,33 @@ class WasabiService {
     return _minioClient!;
   }
 
-  /// Upload a file to Wasabi S3
-  /// Returns the S3 path (not presigned URL) on success, or null on failure
-  Future<String?> uploadFile({
+  /// Upload a file to Wasabi S3.
+  /// Returns the S3 path (not presigned URL) on success, or throws with the
+  /// real reason on failure — callers must not treat a null/absent result
+  /// as "no attachment," since that silently drops the upload with zero
+  /// feedback to the user.
+  Future<String> uploadFile({
     required File file,
     required String fileName,
   }) async {
-    try {
-      final String objectName = 'order-attachments/$fileName';
-      final String contentType = _getContentType(fileName);
+    final String objectName = 'order-attachments/$fileName';
+    final String contentType = _getContentType(fileName);
 
-      // Read file bytes
-      final bytes = await file.readAsBytes();
-      final uint8list = Uint8List.fromList(bytes);
-      final stream = Stream<Uint8List>.value(uint8list);
+    final bytes = await file.readAsBytes();
+    final uint8list = Uint8List.fromList(bytes);
+    final stream = Stream<Uint8List>.value(uint8list);
 
-      // Upload to S3 using putObject
-      var etag = await _client.putObject(
-        AppConstants.wasabiBucket,
-        objectName,
-        stream,
-        size: bytes.length,
-        metadata: {'Content-Type': contentType},
-      );
+    // putObject itself throws on any S3/network/auth failure, so reaching
+    // the return below means the upload genuinely succeeded.
+    await _client.putObject(
+      AppConstants.wasabiBucket,
+      objectName,
+      stream,
+      size: bytes.length,
+      metadata: {'Content-Type': contentType},
+    );
 
-      // Verify upload by checking if object exists
-      bool exists = false;
-      try {
-        await _client.statObject(AppConstants.wasabiBucket, objectName);
-        exists = true;
-        ('✅ Upload verified - file exists: $objectName');
-      } catch (e) {
-        ('⚠️ Could not verify upload: $e');
-        // Even if verification fails, the upload might have succeeded
-        // Return the path anyway since putObject completed
-        exists = etag != null;
-      }
-
-      if (exists) {
-        ('Upload succeeded!');
-        ('ETag: $etag');
-      } else {
-        ('Upload may have failed - no ETag returned');
-      }
-
-      return objectName;
-    } catch (e) {
-      ('❌ Error uploading file: $e');
-      return null;
-    }
+    return objectName;
   }
 
   /// Generate a unique filename for attachments

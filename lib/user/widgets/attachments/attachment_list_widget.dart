@@ -107,6 +107,7 @@ class _AttachmentListWidgetState extends State<AttachmentListWidget> {
       });
 
       final List<Attachment> newAttachments = [];
+      final List<String> uploadErrors = [];
 
       for (int i = 0; i < images.length; i++) {
         final XFile image = images[i];
@@ -128,18 +129,21 @@ class _AttachmentListWidgetState extends State<AttachmentListWidget> {
           index: currentImageCount + i,
         );
 
-        // Upload to Wasabi
-        final uploadedPath = await _wasabiService.uploadFile(
-          file: compressedImage,
-          fileName: fileName,
-        );
-
-        if (uploadedPath != null) {
+        // Upload to Wasabi — a failure here must not be silently dropped:
+        // the old null-on-failure contract meant a fully-failed upload
+        // showed zero feedback at all (no error, no success message).
+        try {
+          final uploadedPath = await _wasabiService.uploadFile(
+            file: compressedImage,
+            fileName: fileName,
+          );
           newAttachments.add(Attachment(
             type: AttachmentType.IMAGE,
             link: uploadedPath,
             localPath: compressedImage.path, // Store local path
           ));
+        } catch (e) {
+          uploadErrors.add(e.toString());
         }
 
         setState(() {
@@ -155,12 +159,14 @@ class _AttachmentListWidgetState extends State<AttachmentListWidget> {
         widget.onAttachmentsChanged([...widget.attachments, ...newAttachments]);
         _showSuccess('تم رفع ${newAttachments.length} صورة بنجاح');
       }
+      if (uploadErrors.isNotEmpty) {
+        _showError('تعذر رفع ${uploadErrors.length} صورة: ${uploadErrors.first}');
+      }
     } catch (e) {
       setState(() {
         _isUploading = false;
       });
-      _showError('حدث خطأ أثناء رفع الصور');
-      ('Error picking images: $e');
+      _showError('حدث خطأ أثناء رفع الصور: ${e.toString()}');
     }
   }
 
@@ -238,24 +244,27 @@ class _AttachmentListWidgetState extends State<AttachmentListWidget> {
             );
 
             // Upload to Wasabi
-            final uploadedPath = await _wasabiService.uploadFile(
-              file: audioFile,
-              fileName: fileName,
-            );
+            try {
+              final uploadedPath = await _wasabiService.uploadFile(
+                file: audioFile,
+                fileName: fileName,
+              );
 
-            setState(() {
-              _isUploading = false;
-            });
+              setState(() {
+                _isUploading = false;
+              });
 
-            if (uploadedPath != null) {
               final newAttachment = Attachment(
                 type: AttachmentType.VOICE,
                 link: uploadedPath,
               );
               widget.onAttachmentsChanged([...widget.attachments, newAttachment]);
               _showSuccess('تم رفع الملاحظة الصوتية بنجاح');
-            } else {
-              _showError('فشل رفع الملاحظة الصوتية');
+            } catch (e) {
+              setState(() {
+                _isUploading = false;
+              });
+              _showError('فشل رفع الملاحظة الصوتية: ${e.toString()}');
             }
           },
         ),
