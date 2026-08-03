@@ -49,20 +49,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         );
       } else {
+        String message = 'حدث خطأ، يرجى المحاولة مرة أخرى';
+        try {
+          final body = jsonDecode(response.body);
+          message = body['error'] ?? body['message'] ?? message;
+        } catch (_) {}
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('حدث خطأ، يرجى المحاولة مرة أخرى'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر الاتصال بالخادم'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('تعذر الاتصال بالخادم: ${e.toString()}'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

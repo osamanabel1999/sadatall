@@ -47,10 +47,19 @@ class _VendorOffersScreenState extends State<VendorOffersScreen> {
           _isLoading = false;
         });
       }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          final data = e.response?.data;
+          _error = (data is Map ? (data['error'] ?? data['message']) : null) ??
+              'حدث خطأ في تحميل العروض: ${e.message}';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'حدث خطأ في تحميل العروض';
+          _error = 'حدث خطأ في تحميل العروض: ${e.toString()}';
           _isLoading = false;
         });
       }
