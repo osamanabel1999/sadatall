@@ -14,11 +14,13 @@ class AuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isLoading = false;
   bool _isVendorLocked = false;
-  
+  String? _errorMessage;
+
   Vendor? get currentVendor => _currentVendor;
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   bool get isVendorLocked => _isVendorLocked;
+  String? get errorMessage => _errorMessage;
 
   Future<void> checkAuthStatus() async {
     _setLoading(true);
@@ -150,6 +152,7 @@ class AuthProvider with ChangeNotifier {
     required File image,
   }) async {
     _setLoading(true);
+    _errorMessage = null;
 
     try {
       final result = await _authService.signup(
@@ -169,15 +172,16 @@ class AuthProvider with ChangeNotifier {
         _currentVendor = result.vendor;
         _isAuthenticated = true;
         _setLoading(false);
-        
+
         return true;
       } else {
+        _errorMessage = result.error ?? 'فشل إنشاء الحساب';
         _setLoading(false);
         return false;
       }
     } catch (e) {
+      _errorMessage = 'حدث خطأ غير متوقع: ${e.toString()}';
       _setLoading(false);
-      // Show user-friendly error message instead of just returning false
       if (kDebugMode) {
         ('خطأ غير متوقع: ${e.toString()}');
       }

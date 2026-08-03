@@ -69,7 +69,7 @@ class AuthService {
     } catch (e) {
       return AuthResult(
         success: false,
-        error: 'خطأ غير متوقع أثناء تسجيل الدخول',
+        error: 'خطأ غير متوقع أثناء تسجيل الدخول: ${e.toString()}',
       );
     }
   }
@@ -149,7 +149,7 @@ class AuthService {
     } catch (e) {
       return AuthResult(
         success: false,
-        error: 'خطأ غير متوقع أثناء إنشاء الحساب',
+        error: 'خطأ غير متوقع أثناء إنشاء الحساب: ${e.toString()}',
       );
     }
   }

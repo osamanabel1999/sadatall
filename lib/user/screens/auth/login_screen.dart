@@ -67,8 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فشل تسجيل الدخول'),
+            SnackBar(
+              content: Text(authProvider.errorMessage ?? 'فشل تسجيل الدخول'),
               backgroundColor: AppTheme.errorColor,
             ),
           );

@@ -185,8 +185,8 @@ class _SignupScreenState extends State<SignupScreen> {
           Navigator.of(context).pushReplacementNamed('/dashboard');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فشل إنشاء الحساب'),
+            SnackBar(
+              content: Text(authProvider.errorMessage ?? 'فشل إنشاء الحساب'),
               backgroundColor: AppTheme.errorColor,
             ),
           );
