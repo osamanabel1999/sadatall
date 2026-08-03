@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../../core/network/api_client.dart';
 import '../../../../core/config/api_config.dart';
+import '../../../../core/errors/api_exception.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../../../core/utils/app_utils.dart';
 import '../models/captain_model.dart';
@@ -41,7 +42,7 @@ class AuthService {
     }
 
     try {
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
       final body = jsonDecode(response.body);
 
@@ -63,13 +64,19 @@ class AuthService {
 
         return result;
       } else {
-        throw Exception(body['error'] ?? 'Registration failed');
+        // ApiException (not a bare Exception) — AppUtils.getLocalizedErrorMessage
+        // only preserves the real message for this type; a plain Exception
+        // fell through to its fully generic fallback string.
+        throw ApiException(
+          message: body['error'] ?? body['message'] ?? 'Registration failed',
+          statusCode: response.statusCode,
+          errorCode: body['errorCode']?.toString(),
+        );
       }
+    } on ApiException {
+      rethrow;
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
-      throw Exception(AppUtils.getLocalizedErrorMessage(e));
+      throw ApiException(message: AppUtils.getLocalizedErrorMessage(e));
     }
   }
 
@@ -102,7 +109,7 @@ class AuthService {
 
       return data;
     } else {
-      throw Exception(response.error ?? 'Login failed');
+      throw ApiException(message: response.error ?? 'Login failed');
     }
   }
 
@@ -115,12 +122,12 @@ class AuthService {
     _apiClient.clearAuthToken();
   }
 
+  // Unlike logout (always "succeeds" locally regardless of the backend
+  // call), a failed delete must NOT proceed with local cleanup: the
+  // account still exists on the backend, and clearing local tokens here
+  // would make the captain think it was deleted when it wasn't.
   Future<void> deleteAccount() async {
-    try {
-      await _apiClient.delete(ApiConfig.deleteAccount);
-    } catch (_) {
-      // Proceed with local cleanup regardless of server response
-    }
+    await _apiClient.delete(ApiConfig.deleteAccount);
     await _storageService.deleteSecureString(StorageService.keyAuthToken);
     await _storageService.deleteSecureString(StorageService.keyRefreshToken);
     _apiClient.clearAuthToken();

@@ -19,6 +19,12 @@ class ApiClient {
   String? _refreshToken;
   Future<void>? _refreshFuture;
 
+  // Unlike the Dio-based user/vendor clients (which set connectTimeout /
+  // receiveTimeout), plain package:http requests never time out on their
+  // own — a hanging connection would just hang forever instead of
+  // surfacing a clear "connection timed out" message.
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   void setAuthToken(String token) {
     _authToken = token;
   }
@@ -74,14 +80,16 @@ class ApiClient {
     }
 
     try {
-      final response = await _client.post(
-        _buildUri(ApiConfig.refreshTokenEndpoint),
-        headers: ApiConfig.headers,
-        body: jsonEncode({
-          'refreshToken': _refreshToken,
-          'type': 'captain',
-        }),
-      );
+      final response = await _client
+          .post(
+            _buildUri(ApiConfig.refreshTokenEndpoint),
+            headers: ApiConfig.headers,
+            body: jsonEncode({
+              'refreshToken': _refreshToken,
+              'type': 'captain',
+            }),
+          )
+          .timeout(_requestTimeout);
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200 && body['success'] == true) {
@@ -175,10 +183,9 @@ class ApiClient {
     try {
       await _ensureValidToken();
       final uri = _buildUri(endpoint, queryParams);
-      final response = await _client.get(
-        uri,
-        headers: _getHeaders(),
-      );
+      final response = await _client
+          .get(uri, headers: _getHeaders())
+          .timeout(_requestTimeout);
       return _handleResponse<T>(response, fromJson);
     } catch (e) {
       if (e is ApiException) {
@@ -196,11 +203,13 @@ class ApiClient {
     try {
       await _ensureValidToken();
       final uri = _buildUri(endpoint);
-      final response = await _client.post(
-        uri,
-        headers: _getHeaders(),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _client
+          .post(
+            uri,
+            headers: _getHeaders(),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_requestTimeout);
       return _handleResponse<T>(response, fromJson);
     } catch (e) {
       if (e is ApiException) {
@@ -218,11 +227,13 @@ class ApiClient {
     try {
       await _ensureValidToken();
       final uri = _buildUri(endpoint);
-      final response = await _client.put(
-        uri,
-        headers: _getHeaders(),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _client
+          .put(
+            uri,
+            headers: _getHeaders(),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_requestTimeout);
       return _handleResponse<T>(response, fromJson);
     } catch (e) {
       if (e is ApiException) {
@@ -239,10 +250,9 @@ class ApiClient {
     try {
       await _ensureValidToken();
       final uri = _buildUri(endpoint);
-      final response = await _client.delete(
-        uri,
-        headers: _getHeaders(),
-      );
+      final response = await _client
+          .delete(uri, headers: _getHeaders())
+          .timeout(_requestTimeout);
       return _handleResponse<T>(response, fromJson);
     } catch (e) {
       if (e is ApiException) {

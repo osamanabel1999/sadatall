@@ -1,6 +1,6 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/config/api_config.dart';
-import '../../../../core/utils/app_utils.dart';
+import '../../../../core/errors/api_exception.dart';
 import '../models/order_model.dart';
 
 class OrdersService {
@@ -21,11 +21,10 @@ class OrdersService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(
-        AppUtils.getLocalizedErrorMessage(
-          response.error ?? 'Failed to fetch available orders',
-        ),
-      );
+      // ApiException (not a bare Exception) so AppUtils.getLocalizedErrorMessage
+      // upstream preserves this real backend message instead of falling
+      // back to its fully generic string.
+      throw ApiException(message: response.error ?? 'Failed to fetch available orders');
     }
   }
 
@@ -54,11 +53,7 @@ class OrdersService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(
-        AppUtils.getLocalizedErrorMessage(
-          response.error ?? 'Failed to fetch captain orders',
-        ),
-      );
+      throw ApiException(message: response.error ?? 'Failed to fetch captain orders');
     }
   }
 
@@ -77,11 +72,7 @@ class OrdersService {
     if (response.success) {
       return true;
     } else {
-      throw Exception(
-        AppUtils.getLocalizedErrorMessage(
-          response.error ?? 'Failed to accept order',
-        ),
-      );
+      throw ApiException(message: response.error ?? 'Failed to accept order');
     }
   }
 
@@ -96,11 +87,7 @@ class OrdersService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(
-        AppUtils.getLocalizedErrorMessage(
-          response.error ?? 'Failed to mark order as delivered',
-        ),
-      );
+      throw ApiException(message: response.error ?? 'Failed to mark order as delivered');
     }
   }
 
@@ -110,11 +97,7 @@ class OrdersService {
     final response = await _apiClient.put(endpoint);
 
     if (!response.success) {
-      throw Exception(
-        AppUtils.getLocalizedErrorMessage(
-          response.error ?? 'Failed to notify arrival',
-        ),
-      );
+      throw ApiException(message: response.error ?? 'Failed to notify arrival');
     }
   }
 

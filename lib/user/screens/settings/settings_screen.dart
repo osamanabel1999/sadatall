@@ -33,7 +33,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirmed) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.deleteAccount();
+      final success = await authProvider.deleteAccount();
+
+      if (!mounted) return;
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(authProvider.errorMessage ?? 'تعذر حذف الحساب')),
+        );
+        return;
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('selected_app_mode');

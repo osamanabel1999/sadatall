@@ -46,13 +46,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
       );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data?['error'] ?? 'حدث خطأ، يرجى المحاولة مرة أخرى';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ، يرجى المحاولة مرة أخرى'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('حدث خطأ: ${e.toString()}'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

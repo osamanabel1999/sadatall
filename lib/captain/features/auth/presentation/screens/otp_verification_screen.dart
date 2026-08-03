@@ -124,30 +124,38 @@ class _CaptainOtpVerificationScreenState
     setState(() => _isResending = true);
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/auth/forgot-password');
-      await http.post(
+      final response = await http.post(
         uri,
         headers: ApiConfig.headers,
         body: jsonEncode({'email': widget.email, 'role': 'captain'}),
       );
       if (!mounted) return;
-      for (final c in _controllers) {
-        c.clear();
+      if (response.statusCode == 200) {
+        for (final c in _controllers) {
+          c.clear();
+        }
+        _focusNodes.first.requestFocus();
+        _startTimer();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال رمز جديد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        String message = 'حدث خطأ، يرجى المحاولة مرة أخرى';
+        try {
+          final body = jsonDecode(response.body);
+          message = body['error'] ?? body['message'] ?? message;
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
       }
-      _focusNodes.first.requestFocus();
-      _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إرسال رمز جديد'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ، يرجى المحاولة مرة أخرى'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('تعذر الاتصال بالخادم: ${e.toString()}'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isResending = false);

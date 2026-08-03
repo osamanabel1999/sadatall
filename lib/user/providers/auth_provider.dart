@@ -9,10 +9,12 @@ class AuthProvider with ChangeNotifier {
   User? _currentUser;
   bool _isAuthenticated = false;
   bool _isLoading = false;
+  String? _errorMessage;
 
   User? get currentUser => _currentUser;
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   Future<void> checkAuthStatus() async {
     _setLoading(true);
@@ -46,6 +48,7 @@ class AuthProvider with ChangeNotifier {
   // User login method
   Future<bool> loginUser(String email, String password) async {
     _setLoading(true);
+    _errorMessage = null;
 
     try {
       final result = await _authService.login(
@@ -56,19 +59,21 @@ class AuthProvider with ChangeNotifier {
       if (result.success && result.user != null) {
         _currentUser = result.user;
         _isAuthenticated = true;
-        
+
         // Subscribe to notifications
         if (_currentUser != null) {
           NotificationUtils.subscribeToOrderNotifications(_currentUser!.id);
         }
-        
+
         _setLoading(false);
         return true;
       } else {
+        _errorMessage = result.error ?? 'فشل تسجيل الدخول';
         _setLoading(false);
         return false;
       }
     } catch (e) {
+      _errorMessage = 'حدث خطأ أثناء تسجيل الدخول: ${e.toString()}';
       _setLoading(false);
       return false;
     }
@@ -91,14 +96,22 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> deleteAccount() async {
     _setLoading(true);
+    _errorMessage = null;
 
     try {
-      await _authService.deleteAccount();
-      _currentUser = null;
-      _isAuthenticated = false;
-      _setLoading(false);
-      return true;
+      final result = await _authService.deleteAccount();
+      if (result.success) {
+        _currentUser = null;
+        _isAuthenticated = false;
+        _setLoading(false);
+        return true;
+      } else {
+        _errorMessage = result.error ?? 'تعذر حذف الحساب';
+        _setLoading(false);
+        return false;
+      }
     } catch (e) {
+      _errorMessage = 'حدث خطأ أثناء حذف الحساب: ${e.toString()}';
       _setLoading(false);
       return false;
     }

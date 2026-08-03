@@ -37,7 +37,7 @@ class _OffersScreenState extends State<OffersScreen> {
       });
     } else {
       setState(() {
-        _error = result.message ?? 'حدث خطأ';
+        _error = result.error ?? 'حدث خطأ';
         _isLoading = false;
       });
     }
