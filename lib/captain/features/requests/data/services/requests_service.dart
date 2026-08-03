@@ -1,5 +1,6 @@
 import "../../../../core/network/api_client.dart";
 import "../../../../core/config/api_config.dart";
+import "../../../../core/errors/api_exception.dart";
 import "../models/captain_request_model.dart";
 
 class RequestsService {
@@ -17,7 +18,7 @@ class RequestsService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(response.error ?? "Failed to submit request");
+      throw ApiException(message: response.error ?? "Failed to submit request");
     }
   }
 
@@ -46,7 +47,7 @@ class RequestsService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(response.error ?? "Failed to fetch requests");
+      throw ApiException(message: response.error ?? "Failed to fetch requests");
     }
   }
 
@@ -56,7 +57,7 @@ class RequestsService {
     final response = await _apiClient.delete(endpoint);
 
     if (!response.success) {
-      throw Exception(response.error ?? "Failed to delete request");
+      throw ApiException(message: response.error ?? "Failed to delete request");
     }
   }
 }

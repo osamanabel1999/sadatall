@@ -3,6 +3,7 @@ import "dart:io";
 import "package:http/http.dart" as http;
 import "../../../../core/network/api_client.dart";
 import "../../../../core/config/api_config.dart";
+import "../../../../core/errors/api_exception.dart";
 import "../../../../core/services/storage_service.dart";
 import "../../../auth/data/models/captain_model.dart";
 import "../models/captain_stats.dart";
@@ -18,7 +19,7 @@ class ProfileService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(response.error ?? "Failed to fetch profile");
+      throw ApiException(message: response.error ?? "Failed to fetch profile");
     }
   }
 
@@ -48,7 +49,10 @@ class ProfileService {
       final body = jsonDecode(response.body);
 
       if (response.statusCode < 200 || response.statusCode >= 300 || body['success'] != true) {
-        throw Exception(body['error'] ?? "Failed to update profile");
+        throw ApiException(
+          message: body['error'] ?? "Failed to update profile",
+          statusCode: response.statusCode,
+        );
       }
     } else {
       // Regular JSON request
@@ -57,7 +61,7 @@ class ProfileService {
         body: data,
       );
       if (!response.success) {
-        throw Exception(response.error ?? "Failed to update profile");
+        throw ApiException(message: response.error ?? "Failed to update profile");
       }
     }
   }
@@ -70,7 +74,7 @@ class ProfileService {
     if (response.success && response.data != null) {
       return response.data!;
     } else {
-      throw Exception(response.error ?? "Failed to fetch stats");
+      throw ApiException(message: response.error ?? "Failed to fetch stats");
     }
   }
 }
