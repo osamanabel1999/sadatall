@@ -169,17 +169,20 @@ class AuthService {
     }
   }
 
-  Future<bool> deleteAccount() async {
+  // Unlike logout (always "succeeds" locally regardless of the backend
+  // call), a failed delete must NOT be reported as success: the vendor
+  // account still exists on the backend, and clearing local tokens here
+  // would make the user think it was deleted when it wasn't.
+  Future<AuthResult> deleteAccount() async {
     try {
-      await _apiService.delete(AppConstants.deleteAccountEndpoint);
-      await _storageService.clearAllTokens();
-      return true;
-    } catch (e) {
-      await _storageService.clearAllTokens();
-      if (kDebugMode) {
-        ('خطأ غير متوقع أثناء حذف الحساب: ${e.toString()}');
+      final response = await _apiService.delete(AppConstants.deleteAccountEndpoint);
+      if (response.success) {
+        await _storageService.clearAllTokens();
+        return AuthResult(success: true, message: response.message ?? 'تم حذف الحساب بنجاح');
       }
-      return true;
+      return AuthResult(success: false, error: response.error ?? 'تعذر حذف الحساب');
+    } catch (e) {
+      return AuthResult(success: false, error: 'حدث خطأ أثناء حذف الحساب: ${e.toString()}');
     }
   }
 

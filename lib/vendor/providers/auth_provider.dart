@@ -123,14 +123,22 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> deleteAccount() async {
     _setLoading(true);
+    _errorMessage = null;
 
     try {
-      await _authService.deleteAccount();
-      _currentVendor = null;
-      _isAuthenticated = false;
-      _setLoading(false);
-      return true;
+      final result = await _authService.deleteAccount();
+      if (result.success) {
+        _currentVendor = null;
+        _isAuthenticated = false;
+        _setLoading(false);
+        return true;
+      } else {
+        _errorMessage = result.error ?? 'تعذر حذف الحساب';
+        _setLoading(false);
+        return false;
+      }
     } catch (e) {
+      _errorMessage = 'حدث خطأ أثناء حذف الحساب: ${e.toString()}';
       _setLoading(false);
       if (kDebugMode) {
         ('خطأ غير متوقع أثناء حذف الحساب: ${e.toString()}');

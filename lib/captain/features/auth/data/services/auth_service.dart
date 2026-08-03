@@ -122,12 +122,12 @@ class AuthService {
     _apiClient.clearAuthToken();
   }
 
+  // Unlike logout (always "succeeds" locally regardless of the backend
+  // call), a failed delete must NOT proceed with local cleanup: the
+  // account still exists on the backend, and clearing local tokens here
+  // would make the captain think it was deleted when it wasn't.
   Future<void> deleteAccount() async {
-    try {
-      await _apiClient.delete(ApiConfig.deleteAccount);
-    } catch (_) {
-      // Proceed with local cleanup regardless of server response
-    }
+    await _apiClient.delete(ApiConfig.deleteAccount);
     await _storageService.deleteSecureString(StorageService.keyAuthToken);
     await _storageService.deleteSecureString(StorageService.keyRefreshToken);
     _apiClient.clearAuthToken();

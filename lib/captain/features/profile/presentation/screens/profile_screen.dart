@@ -365,6 +365,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 await ref.read(authStateProvider.notifier).deleteAccount();
 
+                final error = ref.read(authStateProvider).error;
+                if (error != null) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error)),
+                    );
+                  }
+                  return;
+                }
+
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('selected_app_mode');
 
