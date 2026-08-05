@@ -37,33 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _userLatitude;
   double? _userLongitude;
 
-  static const List<IconData> _quickPickIcons = [
-    Icons.restaurant,
-    Icons.local_pizza,
-    Icons.lunch_dining,
-    Icons.icecream,
-  ];
-
-  /// Photo shown in the quick-pick circle, keyed by the category name the
-  /// backend returns. Categories with no entry here fall back to the matching
-  /// icon in [_quickPickIcons].
-  static const Map<String, String> _quickPickImages = {
-    'جزارة': 'assets/user/images/categories/meat.jpeg',
-    'طيور ودواجن': 'assets/user/images/categories/meat.jpeg',
-    'سوبر ماركت': 'assets/user/images/categories/supermarket.jpeg',
-    'بقالة': 'assets/user/images/categories/supermarket.jpeg',
-    'اسماك': 'assets/user/images/categories/seafood.jpeg',
-    'أسماك': 'assets/user/images/categories/seafood.jpeg',
-    // Keyed to the exact names the backend returns, e.g. 'مخبوزات وحلويات'
-    // rather than the shorter filename. Asset filenames stay ASCII — Arabic
-    // ones are unreliable in the asset bundle.
-    'مخبوزات وحلويات': 'assets/user/images/categories/bakery.jpeg',
-    'مخبوزات': 'assets/user/images/categories/bakery.jpeg',
-    'البان': 'assets/user/images/categories/dairy.jpeg',
-    'ألبان': 'assets/user/images/categories/dairy.jpeg',
-    'منتجات ألبان': 'assets/user/images/categories/dairy.jpeg',
-  };
-
   @override
   void initState() {
     super.initState();
@@ -406,99 +379,81 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// The only categories the quick-pick row may show, in order. A category
-  /// not listed here never appears, even if that leaves the row short.
-  static const List<String> _preferredQuickPicks = [
-    'جزارة',
-    'سوبر ماركت',
-    'مخبوزات وحلويات',
-    'طيور ودواجن',
-  ];
-
   /// Picks the categories shown under "في بالك إيه دلوقتي؟".
-  ///
-  /// Strictly limited to [_preferredQuickPicks]: this used to backfill empty
-  /// slots from the rest of the category list, which is how صيدليات ended up
-  /// in the row. Showing three curated entries beats showing a fourth nobody
-  /// chose, so a preferred category that does not exist simply leaves the row
-  /// one shorter.
-  List<Category> _resolveQuickPicks() {
-    final byName = <String, Category>{
-      for (final c in _categories) c.name.trim(): c,
-    };
-
-    final picks = <Category>[];
-    for (final name in _preferredQuickPicks) {
-      final match = byName[name];
-      if (match != null) picks.add(match);
-    }
-
-    return picks.take(_quickPickIcons.length).toList();
-  }
-
+    /// one shorter.
   Widget _buildQuickPicks() {
     if (_categories.isEmpty) return const SizedBox.shrink();
 
-    final quickPicks = _resolveQuickPicks();
-    if (quickPicks.isEmpty) return const SizedBox.shrink();
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'في بالك إيه دلوقتي؟',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Text(
+              'في بالك إيه دلوقتي؟',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              for (var i = 0; i < quickPicks.length; i++)
-                Expanded(
-                  child: _buildQuickPickItem(quickPicks[i], _quickPickIcons[i]),
-                ),
-            ],
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(right: 16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) =>
+                  _buildQuickPickItem(_categories[index]),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickPickItem(Category category, IconData icon) {
-    final imagePath = _quickPickImages[category.name.trim()];
-
+  Widget _buildQuickPickItem(Category category) {
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppTheme.backgroundColor,
-            // to the icon the category used before.
-            child: imagePath == null
-                ? Icon(icon, color: AppTheme.primaryColor, size: 28)
-                : ClipOval(
-                    child: Image.asset(
-                      imagePath,
+      child: SizedBox(
+        width: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: category.imageUrl != null
+                  ? SmartImage(
+                      imageSource: category.imageUrl,
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Icon(icon, color: AppTheme.primaryColor, size: 28),
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            category.name,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
+                      errorWidget: _quickPickFallbackIcon(),
+                    )
+                  : _quickPickFallbackIcon(),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              category.name,
+              style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickPickFallbackIcon() {
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: AppTheme.backgroundColor,
+      child: Icon(
+        Icons.category_outlined,
+        color: AppTheme.primaryColor,
+        size: 28,
       ),
     );
   }
