@@ -1,12 +1,14 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sadat_delivery_merged/main.dart' show navigatorKey;
 import 'package:sadat_delivery_merged/vendor/screens/orders/order_details_screen.dart';
 import 'dart:convert';
 import 'order_service.dart';
 import 'auth_service.dart';
+import '../providers/auth_provider.dart';
 import '../utils/time_utils.dart';
 import '../screens/chat/vendor_support_chat_tab.dart';
 import '../screens/chat/vendor_order_chat_screen.dart';
@@ -258,11 +260,24 @@ class NotificationService {
     }
   }
 
-  void _openChatFromNotification(Map<String, dynamic> data) {
+  Future<void> _openChatFromNotification(Map<String, dynamic> data) async {
     final navState = navigatorKey.currentState;
     if (navState == null) return;
     final chatId = data['chatId'] as String?;
     if (chatId == null) return;
+
+    // Tapping this notification on a cold start (app process was killed)
+    // fires via getInitialMessage() and can race ahead of the splash
+    // screen's own AuthProvider.checkAuthStatus() — pushing the chat tab
+    // immediately then hit a still-empty currentVendor and showed "please
+    // log in" even though the vendor was, in fact, still logged in.
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.currentVendor == null) {
+        await authProvider.checkAuthStatus();
+      }
+    }
 
     if (chatId.startsWith('support_vendor_')) {
       navState.push(MaterialPageRoute(builder: (_) => const VendorSupportChatTab()));
