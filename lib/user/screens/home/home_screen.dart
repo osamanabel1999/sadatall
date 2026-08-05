@@ -44,6 +44,26 @@ class _HomeScreenState extends State<HomeScreen> {
     Icons.icecream,
   ];
 
+  /// Photo shown in the quick-pick circle, keyed by the category name the
+  /// backend returns. Categories with no entry here fall back to the matching
+  /// icon in [_quickPickIcons].
+  static const Map<String, String> _quickPickImages = {
+    'جزارة': 'assets/user/images/categories/meat.jpeg',
+    'طيور ودواجن': 'assets/user/images/categories/meat.jpeg',
+    'سوبر ماركت': 'assets/user/images/categories/supermarket.jpeg',
+    'بقالة': 'assets/user/images/categories/supermarket.jpeg',
+    'اسماك': 'assets/user/images/categories/seafood.jpeg',
+    'أسماك': 'assets/user/images/categories/seafood.jpeg',
+    // Keyed to the exact names the backend returns, e.g. 'مخبوزات وحلويات'
+    // rather than the shorter filename. Asset filenames stay ASCII — Arabic
+    // ones are unreliable in the asset bundle.
+    'مخبوزات وحلويات': 'assets/user/images/categories/bakery.jpeg',
+    'مخبوزات': 'assets/user/images/categories/bakery.jpeg',
+    'البان': 'assets/user/images/categories/dairy.jpeg',
+    'ألبان': 'assets/user/images/categories/dairy.jpeg',
+    'منتجات ألبان': 'assets/user/images/categories/dairy.jpeg',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -386,10 +406,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// The only categories the quick-pick row may show, in order. A category
+  /// not listed here never appears, even if that leaves the row short.
+  static const List<String> _preferredQuickPicks = [
+    'جزارة',
+    'سوبر ماركت',
+    'مخبوزات وحلويات',
+    'طيور ودواجن',
+  ];
+
+  /// Picks the categories shown under "في بالك إيه دلوقتي؟".
+  ///
+  /// Strictly limited to [_preferredQuickPicks]: this used to backfill empty
+  /// slots from the rest of the category list, which is how صيدليات ended up
+  /// in the row. Showing three curated entries beats showing a fourth nobody
+  /// chose, so a preferred category that does not exist simply leaves the row
+  /// one shorter.
+  List<Category> _resolveQuickPicks() {
+    final byName = <String, Category>{
+      for (final c in _categories) c.name.trim(): c,
+    };
+
+    final picks = <Category>[];
+    for (final name in _preferredQuickPicks) {
+      final match = byName[name];
+      if (match != null) picks.add(match);
+    }
+
+    return picks.take(_quickPickIcons.length).toList();
+  }
+
   Widget _buildQuickPicks() {
     if (_categories.isEmpty) return const SizedBox.shrink();
 
-    final quickPicks = _categories.take(_quickPickIcons.length).toList();
+    final quickPicks = _resolveQuickPicks();
     if (quickPicks.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -416,6 +466,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickPickItem(Category category, IconData icon) {
+    final imagePath = _quickPickImages[category.name.trim()];
+
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
       child: Column(
@@ -424,7 +476,19 @@ class _HomeScreenState extends State<HomeScreen> {
           CircleAvatar(
             radius: 28,
             backgroundColor: AppTheme.backgroundColor,
-            child: Icon(icon, color: AppTheme.primaryColor, size: 28),
+            // to the icon the category used before.
+            child: imagePath == null
+                ? Icon(icon, color: AppTheme.primaryColor, size: 28)
+                : ClipOval(
+                    child: Image.asset(
+                      imagePath,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Icon(icon, color: AppTheme.primaryColor, size: 28),
+                    ),
+                  ),
           ),
           const SizedBox(height: 6),
           Text(

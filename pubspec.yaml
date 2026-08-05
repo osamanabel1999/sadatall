@@ -113,4 +113,5 @@ flutter:
     - assets/captain/
     - assets/vendor/images/
     - assets/user/images/
+    - assets/user/images/categories/
     - assets/user/
