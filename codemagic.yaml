@@ -11,15 +11,26 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
+      # Must NOT be silenced: this writes ios/Flutter/Generated.xcconfig, which is
+      # gitignored and which every Runner build configuration #includes. If it fails
+      # quietly, xcodebuild later dies with the misleading
+      # "Failed to create project from scheme 'Runner' ... target or config missing".
       - name: Flutter config-only (generates xcconfig & plugin files, skips pod install)
         script: |
-          flutter build ios --config-only --no-codesign 2>/dev/null || true
+          flutter build ios --config-only --no-codesign
+          test -f ios/Flutter/Generated.xcconfig \
+            || { echo "Generated.xcconfig was not created"; exit 1; }
 
+      # The cd runs in a subshell: Codemagic keeps the working directory
+      # between steps, so a bare `cd ios` here left every later step looking
+      # for ios/ios/... and xcodebuild failed to load the workspace.
       - name: Clean and reinstall pods
         script: |
-          cd ios
-          rm -rf Pods Podfile.lock
-          pod install --repo-update
+          (
+            cd ios
+            rm -rf Pods Podfile.lock
+            pod install --repo-update
+          )
 
       - name: Verify -GCC_WARN_INHIBIT_ALL_WARNINGS was removed by Podfile hook
         script: |
@@ -46,6 +57,7 @@ workflows:
 
       - name: Build iOS Release (xcodebuild direct, fresh DerivedData)
         script: |
+          cd "$CM_BUILD_DIR"
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -82,15 +94,23 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
+      # See the note in ios-release-build above: silencing this hides the failure
+      # that produces the "target or config missing" scheme error downstream.
       - name: Flutter config-only (generates xcconfig & plugin files, skips pod install)
         script: |
-          flutter build ios --config-only --no-codesign 2>/dev/null || true
+          flutter build ios --config-only --no-codesign
+          test -f ios/Flutter/Generated.xcconfig \
+            || { echo "Generated.xcconfig was not created"; exit 1; }
 
+      # Subshell so the cd cannot leak into later steps — see the note in
+      # ios-release-build above.
       - name: Clean and reinstall pods
         script: |
-          cd ios
-          rm -rf Pods Podfile.lock
-          pod install --repo-update
+          (
+            cd ios
+            rm -rf Pods Podfile.lock
+            pod install --repo-update
+          )
 
       - name: Strip unsupported -G flag from all pod xcconfig files
         script: |
@@ -111,6 +131,7 @@ workflows:
 
       - name: Build iOS Release IPA (xcodebuild direct)
         script: |
+          cd "$CM_BUILD_DIR"
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
