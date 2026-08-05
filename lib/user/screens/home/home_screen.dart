@@ -380,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Picks the categories shown under "في بالك إيه دلوقتي؟".
-  /// one shorter.
+ 
   Widget _buildQuickPicks() {
     if (_categories.isEmpty) return const SizedBox.shrink();
 
