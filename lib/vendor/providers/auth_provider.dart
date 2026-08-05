@@ -5,11 +5,13 @@ import '../models/vendor.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/order_service.dart';
+import '../services/vendor_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final OrderService _orderService = OrderService();
-  
+  final VendorService _vendorService = VendorService();
+
   Vendor? _currentVendor;
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -24,11 +26,27 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> checkAuthStatus() async {
     _setLoading(true);
-    
+
     try {
       final isLoggedIn = await _authService.isLoggedIn();
       if (isLoggedIn) {
-        final vendor = await _authService.getCurrentVendor();
+        var vendor = await _authService.getCurrentVendor();
+        // The cached vendor JSON can go missing or fail to parse (e.g. a
+        // secure-storage decrypt issue that tends to show up right after
+        // an app update) even though the access token itself is still
+        // valid. Treating that as "not logged in" was wrong — it left
+        // screens that read currentVendor (like the support chat tab)
+        // stuck showing "please log in" while every other, API-driven
+        // screen kept working fine since it wasn't logged out. Fall back
+        // to fetching the profile fresh instead of giving up.
+        if (vendor == null) {
+          final response = await _vendorService.getProfile();
+          if (response.success && response.data != null) {
+            vendor = response.data;
+            await _authService.cacheVendor(vendor!);
+          }
+        }
+
         if (vendor != null) {
           _currentVendor = vendor;
           // Check if the vendor is locked based on the isLocked field
@@ -43,7 +61,7 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       _isAuthenticated = false;
     }
-    
+
     _setLoading(false);
   }
 
