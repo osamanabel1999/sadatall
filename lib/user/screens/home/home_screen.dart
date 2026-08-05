@@ -37,13 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _userLatitude;
   double? _userLongitude;
 
-  static const List<IconData> _quickPickIcons = [
-    Icons.restaurant,
-    Icons.local_pizza,
-    Icons.lunch_dining,
-    Icons.icecream,
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -389,53 +382,72 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildQuickPicks() {
     if (_categories.isEmpty) return const SizedBox.shrink();
 
-    final quickPicks = _categories.take(_quickPickIcons.length).toList();
-    if (quickPicks.isEmpty) return const SizedBox.shrink();
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'في بالك إيه دلوقتي؟',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Text(
+              'في بالك إيه دلوقتي؟',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              for (var i = 0; i < quickPicks.length; i++)
-                Expanded(
-                  child: _buildQuickPickItem(quickPicks[i], _quickPickIcons[i]),
-                ),
-            ],
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(right: 16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) => _buildQuickPickItem(_categories[index]),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickPickItem(Category category, IconData icon) {
+  Widget _buildQuickPickItem(Category category) {
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppTheme.backgroundColor,
-            child: Icon(icon, color: AppTheme.primaryColor, size: 28),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            category.name,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: SizedBox(
+        width: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: category.imageUrl != null
+                  ? SmartImage(
+                      imageSource: category.imageUrl,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorWidget: _quickPickFallbackIcon(),
+                    )
+                  : _quickPickFallbackIcon(),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              category.name,
+              style: const TextStyle(fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _quickPickFallbackIcon() {
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: AppTheme.backgroundColor,
+      child: Icon(Icons.category_outlined, color: AppTheme.primaryColor, size: 28),
     );
   }
 
