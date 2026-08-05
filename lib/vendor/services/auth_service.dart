@@ -198,6 +198,13 @@ class AuthService {
     return vendor;
   }
 
+  // Re-caches a freshly-fetched vendor (e.g. after getCurrentVendor()
+  // returned null because the cached copy was missing/corrupt) so the
+  // next app launch can read it locally again instead of hitting the API.
+  Future<void> cacheVendor(Vendor vendor) async {
+    await _storageService.saveVendorData(vendor);
+  }
+
   Future<String?> getAccessToken() async {
     return await _storageService.getAccessToken();
   }
